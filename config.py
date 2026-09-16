@@ -18,7 +18,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 SPOTIFY_SP_DC = os.getenv("SPOTIFY_SP_DC", "").strip()
 OWNER_TELEGRAM_ID = os.getenv("OWNER_TELEGRAM_ID", "867551644").strip()
-WEBAPP_URL = os.getenv("WEBAPP_URL", "")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
 
 # База данных
 DATABASE_URL = f"sqlite+aiosqlite:///{DATA_DIR / 'bot.db'}"

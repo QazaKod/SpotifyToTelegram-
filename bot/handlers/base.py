@@ -26,7 +26,7 @@ async def handle_start(message: types.Message):
         text += "\n🎵 Или откройте **Mini App** для визуального выбора треков:"
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="🎵 Открыть плеер", web_app=WebAppInfo(url=config.WEBAPP_URL))]
+                [InlineKeyboardButton(text="🎵 Открыть плеер", web_app=WebAppInfo(url=config.WEBAPP_URL.strip()))]
             ]
         )
         await message.answer(text, reply_markup=kb)
@@ -52,7 +52,7 @@ async def handle_help(message: types.Message):
     if config.WEBAPP_URL:
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="🎵 Открыть плеер", web_app=WebAppInfo(url=config.WEBAPP_URL))]
+                [InlineKeyboardButton(text="🎵 Открыть плеер", web_app=WebAppInfo(url=config.WEBAPP_URL.strip()))]
             ]
         )
         await message.answer(text, reply_markup=kb)
