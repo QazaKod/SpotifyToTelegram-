@@ -11,13 +11,12 @@ from services.spotify import SpotifyTrack
 logger = logging.getLogger(__name__)
 
 
-def _search_youtube(track: SpotifyTrack) -> Optional[str]:
-    """Поиск трека на YouTube с проверкой длительности."""
-    search_queries = [
-        f"ytsearch5:{track.artist_str} - {track.title} Audio",
-        f"ytsearch5:{track.artist_str} - {track.title}",
-    ]
-    ydl_search_opts = {
+def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
+    """
+    Синхронная функция поиска и скачивания трека через yt-dlp.
+    Вызывается в отдельном потоке (через asyncio.to_thread).
+    """
+    ydl_base_search_opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "no_warnings": True,
@@ -31,75 +30,10 @@ def _search_youtube(track: SpotifyTrack) -> Optional[str]:
         },
     }
 
-    for q in search_queries:
-        try:
-            with yt_dlp.YoutubeDL(ydl_search_opts) as ydl:
-                search_results = ydl.extract_info(q, download=False)
-                entries = search_results.get("entries", []) if search_results else []
-
-                # Фильтрация по длительности
-                for entry in entries:
-                    yt_dur = entry.get("duration")
-                    if yt_dur is None:
-                        continue
-                    diff = abs(track.duration_sec - yt_dur)
-                    if diff <= config.DURATION_TOLERANCE:
-                        return entry.get("url") or f"https://www.youtube.com/watch?v={entry.get('id')}"
-
-                # Запасной вариант (до 20 сек разницы)
-                if entries:
-                    first = entries[0]
-                    first_dur = first.get("duration", 0)
-                    if abs(track.duration_sec - first_dur) <= 20:
-                        return first.get("url") or f"https://www.youtube.com/watch?v={first.get('id')}"
-        except Exception as e:
-            logger.debug(f"[YouTube Search] Ошибка поиска '{q}': {e}")
-
-    return None
-
-
-def _search_soundcloud(track: SpotifyTrack) -> Optional[str]:
-    """Резервный поиск трека на SoundCloud (не требует авторизации и не блокирует дата-центры)."""
-    search_queries = [
-        f"scsearch5:{track.artist_str} {track.title}",
-        f"scsearch5:{track.title} {track.artist_str}",
-    ]
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": True,
-        "nocheckcertificate": True,
-    }
-
-    for q in search_queries:
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                res = ydl.extract_info(q, download=False)
-                entries = res.get("entries", []) if res else []
-
-                for entry in entries:
-                    dur = entry.get("duration")
-                    if dur is None:
-                        continue
-                    diff = abs(track.duration_sec - dur)
-                    if diff <= config.DURATION_TOLERANCE + 8:
-                        return entry.get("url")
-
-                if entries:
-                    first = entries[0]
-                    first_dur = first.get("duration", 0)
-                    if abs(track.duration_sec - first_dur) <= 25:
-                        return first.get("url")
-        except Exception as e:
-            logger.debug(f"[SoundCloud Search] Ошибка поиска '{q}': {e}")
-
-    return None
-
-
-def _download_stream(url: str, file_id: str, temp_dir: Path) -> Optional[Path]:
-    """Скачивание аудиопотока по URL и конвертация в MP3 через FFmpeg."""
+    file_id = f"{uuid.uuid4().hex[:8]}_{track.id}"
     out_tmpl = str(temp_dir / f"{file_id}.%(ext)s")
-    ydl_download_opts = {
+
+    ydl_base_download_opts = {
         "format": "bestaudio/best",
         "outtmpl": out_tmpl,
         "postprocessors": [
@@ -123,46 +57,83 @@ def _download_stream(url: str, file_id: str, temp_dir: Path) -> Optional[Path]:
         },
     }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_download_opts) as ydl:
-            ydl.download([url])
+    sources = [
+        {"name": "youtube", "prefix": "ytsearch5:"},
+        {"name": "soundcloud", "prefix": "scsearch5:"}
+    ]
 
-        mp3_file = temp_dir / f"{file_id}.mp3"
-        if mp3_file.exists():
-            return mp3_file
-    except Exception as e:
-        logger.warning(f"Ошибка загрузки потока '{url}': {e}")
+    for source in sources:
+        logger.info(f"[{source['name']}] Поиск трека '{track.artist_str} - {track.title}'")
+        search_query = f"{source['prefix']}{track.artist_str} - {track.title}"
+        if source["name"] == "youtube":
+            search_query += " Audio"
 
-    return None
+        selected_video_url = None
 
+        try:
+            with yt_dlp.YoutubeDL(ydl_base_search_opts) as ydl:
+                search_results = ydl.extract_info(search_query, download=False)
+                entries = search_results.get("entries", []) if search_results else []
 
-def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
-    """
-    Каскадная загрузка трека:
-    1. Пробуем скачать через YouTube
-    2. Если YouTube выдает блокировку/ошибку -> автоматически переключаемся на SoundCloud
-    """
-    file_id = f"{uuid.uuid4().hex[:8]}_{track.id}"
+                # Если для ютуба с "Audio" не нашли, ищем без него
+                if not entries and source["name"] == "youtube":
+                    fallback_query = f"{source['prefix']}{track.artist_str} - {track.title}"
+                    search_results = ydl.extract_info(fallback_query, download=False)
+                    entries = search_results.get("entries", []) if search_results else []
 
-    # 1. Попытка через YouTube
-    yt_url = _search_youtube(track)
-    if yt_url:
-        logger.info(f"Пробуем скачать с YouTube: '{track.artist_str} - {track.title}'")
-        mp3 = _download_stream(yt_url, file_id, temp_dir)
-        if mp3:
-            return mp3
-        logger.warning(f"YouTube заблокировал скачивание '{track.artist_str} - {track.title}'. Переключаемся на резервный источник (SoundCloud)...")
+                # Фильтрация по хронометражу
+                for entry in entries:
+                    yt_dur = entry.get("duration")
+                    if yt_dur is None:
+                        continue
 
-    # 2. Резервный источник: SoundCloud
-    sc_url = _search_soundcloud(track)
-    if sc_url:
-        logger.info(f"Скачиваем из SoundCloud: '{track.artist_str} - {track.title}'")
-        mp3 = _download_stream(sc_url, file_id, temp_dir)
-        if mp3:
-            logger.info(f"Успешно скачано из SoundCloud: '{track.artist_str} - {track.title}'!")
-            return mp3
+                    diff = abs(track.duration_sec - yt_dur)
+                    if diff <= config.DURATION_TOLERANCE:
+                        url_val = entry.get("url") or entry.get("webpage_url")
+                        if not url_val and source["name"] == "youtube" and entry.get("id"):
+                            url_val = f"https://www.youtube.com/watch?v={entry.get('id')}"
+                        selected_video_url = url_val
+                        logger.info(
+                            f"[{source['name']}] Найден подходящий трек: '{entry.get('title')}' (длительность {yt_dur}с, Spotify: {track.duration_sec}с, разница {diff}с)"
+                        )
+                        break
 
-    logger.error(f"Не удалось скачать трек ни с YouTube, ни со SoundCloud: '{track.artist_str} - {track.title}'")
+                # Если строгое совпадение не найдено, берем первый результат с запасом до 20с
+                if not selected_video_url and entries:
+                    first = entries[0]
+                    first_dur = first.get("duration", 0)
+                    diff = abs(track.duration_sec - first_dur)
+                    if diff <= 20:
+                        url_val = first.get("url") or first.get("webpage_url")
+                        if not url_val and source["name"] == "youtube" and first.get("id"):
+                            url_val = f"https://www.youtube.com/watch?v={first.get('id')}"
+                        selected_video_url = url_val
+                        logger.info(f"[{source['name']}] Используем запасной вариант с отклонением {diff}с: '{first.get('title')}'")
+
+        except Exception as e:
+            logger.warning(f"[{source['name']}] Ошибка при поиске трека '{track.artist_str} - {track.title}': {e}")
+            continue
+
+        if not selected_video_url:
+            logger.warning(f"[{source['name']}] Не удалось найти аудио подходящей длительности.")
+            continue
+
+        # Скачивание
+        try:
+            with yt_dlp.YoutubeDL(ydl_base_download_opts) as ydl:
+                ydl.download([selected_video_url])
+
+            mp3_file = temp_dir / f"{file_id}.mp3"
+            if mp3_file.exists():
+                logger.info(f"[{source['name']}] Трек успешно скачан: {mp3_file.name}")
+                return mp3_file
+            else:
+                logger.error(f"[{source['name']}] Файл {mp3_file} не найден после конвертации")
+        except Exception as e:
+            logger.warning(f"[{source['name']}] Ошибка скачивания '{selected_video_url}': {e}")
+            continue
+
+    logger.error(f"Не удалось скачать трек '{track.artist_str} - {track.title}' ни с одного из источников.")
     return None
 
 
