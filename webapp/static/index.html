@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>SpotifyToTelegram</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #1a1a2e);
+      --text: var(--tg-theme-text-color, #e0e0e0);
+      --hint: var(--tg-theme-hint-color, #8a8a9a);
+      --link: var(--tg-theme-link-color, #1db954);
+      --btn: var(--tg-theme-button-color, #1db954);
+      --btn-text: var(--tg-theme-button-text-color, #fff);
+      --secondary-bg: var(--tg-theme-secondary-bg-color, #16213e);
+      --section-bg: var(--tg-theme-section-bg-color, #0f3460);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 100px;
+    }
+
+    .header {
+      text-align: center;
+      padding: 20px 16px 12px;
+    }
+    .header h1 { font-size: 22px; font-weight: 700; }
+    .header p { font-size: 13px; color: var(--hint); margin-top: 4px; }
+
+    .search-box {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px;
+      margin-bottom: 16px;
+    }
+    .search-box input {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: var(--secondary-bg);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-box input:focus { border-color: var(--link); }
+    .search-box input::placeholder { color: var(--hint); }
+
+    .search-box button {
+      padding: 12px 18px;
+      border-radius: 12px;
+      border: none;
+      background: var(--btn);
+      color: var(--btn-text);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+    .search-box button:active { opacity: 0.7; }
+    .search-box button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .playlist-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 16px 12px;
+    }
+    .playlist-header img {
+      width: 64px; height: 64px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    .playlist-header .info h2 { font-size: 17px; font-weight: 600; }
+    .playlist-header .info p { font-size: 12px; color: var(--hint); margin-top: 2px; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      margin-bottom: 4px;
+    }
+    .controls label {
+      font-size: 13px;
+      color: var(--hint);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .controls .selected-count {
+      font-size: 13px;
+      color: var(--link);
+      font-weight: 600;
+    }
+
+    .track-list { list-style: none; }
+
+    .track-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      transition: background 0.15s;
+      cursor: pointer;
+      position: relative;
+    }
+    .track-item:active { background: rgba(255,255,255,0.04); }
+    .track-item.selected { background: rgba(29,185,84,0.08); }
+
+    .track-item .cover-wrap {
+      position: relative;
+      width: 48px; height: 48px;
+      flex-shrink: 0;
+    }
+    .track-item .cover-wrap img {
+      width: 48px; height: 48px;
+      border-radius: 6px;
+      object-fit: cover;
+    }
+    .track-item .cover-wrap .play-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.45);
+      opacity: 0;
+      transition: opacity 0.2s;
+      font-size: 18px;
+    }
+    .track-item .cover-wrap:hover .play-overlay { opacity: 1; }
+    .track-item .cover-wrap.playing .play-overlay { opacity: 1; background: rgba(29,185,84,0.6); }
+
+    .track-info { flex: 1; min-width: 0; }
+    .track-info .title {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-info .artist {
+      font-size: 12px;
+      color: var(--hint);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-dur {
+      font-size: 12px;
+      color: var(--hint);
+      flex-shrink: 0;
+      margin-right: 4px;
+    }
+
+    .track-check {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .track-item.selected .track-check {
+      border-color: var(--link);
+      background: var(--link);
+    }
+    .track-item.selected .track-check::after {
+      content: '✓';
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .download-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--secondary-bg);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      z-index: 100;
+    }
+    .download-bar button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      background: var(--btn);
+      color: var(--btn-text);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .download-bar button:active { opacity: 0.7; }
+    .download-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .progress-section {
+      padding: 0 16px;
+    }
+    .progress-track-name {
+      font-size: 13px;
+      color: var(--hint);
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--link);
+      border-radius: 3px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+    .progress-stats {
+      font-size: 12px;
+      color: var(--hint);
+      text-align: center;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px 16px;
+      color: var(--hint);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--link);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 32px;
+      color: var(--hint);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; line-height: 1.5; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>🎵 SpotifyToTelegram</h1>
+    <p>Insert a Spotify link to preview and download tracks</p>
+  </div>
+
+  <div class="search-box">
+    <input type="text" id="urlInput" placeholder="https://open.spotify.com/playlist/..." autocomplete="off">
+    <button id="loadBtn" onclick="loadPlaylist()">Load</button>
+  </div>
+
+  <!-- Empty state -->
+  <div id="emptyState" class="empty-state">
+    <div class="icon">🎧</div>
+    <p>Paste a Spotify link above<br>to see the track list</p>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingState" class="loading hidden">
+    <div class="spinner"></div>
+    <p>Loading playlist...</p>
+  </div>
+
+  <!-- Playlist content -->
+  <div id="playlistContent" class="hidden">
+    <div class="playlist-header">
+      <img id="playlistCover" src="" alt="">
+      <div class="info">
+        <h2 id="playlistTitle"></h2>
+        <p id="playlistMeta"></p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label>
+        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+        Select all
+      </label>
+      <span class="selected-count" id="selectedCount">0 selected</span>
+    </div>
+
+    <!-- 100 track limit banner -->
+    <div id="limitBanner" class="hidden" style="margin: 6px 16px 10px; padding: 10px 12px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; font-size: 12px; color: #fbbf24; line-height: 1.4;">
+      ⚠️ <b>Лимит Spotify:</b> загружены первые 100 добавленных в плейлист треков. Если треков больше, разделите плейлист в Spotify на части по &lt;100 треков.
+    </div>
+
+    <ul class="track-list" id="trackList"></ul>
+  </div>
+
+  <!-- Download progress -->
+  <div id="progressSection" class="progress-section hidden">
+    <p class="progress-track-name" id="progressTrackName">Preparing...</p>
+    <div class="progress-bar-container">
+      <div class="progress-bar-fill" id="progressBarFill"></div>
+    </div>
+    <p class="progress-stats" id="progressStats"></p>
+  </div>
+
+  <!-- Bottom download button -->
+  <div class="download-bar hidden" id="downloadBar">
+    <button id="downloadBtn" onclick="startDownload()">Download selected (0)</button>
+  </div>
+
+  <audio id="previewPlayer" preload="none"></audio>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    let tracks = [];
+    let selectedIds = new Set();
+    let currentPreviewId = null;
+    const player = document.getElementById('previewPlayer');
+
+    function fmt(sec) {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    async function loadPlaylist() {
+      const url = document.getElementById('urlInput').value.trim();
+      if (!url) return;
+
+      document.getElementById('emptyState').classList.add('hidden');
+      document.getElementById('playlistContent').classList.add('hidden');
+      document.getElementById('downloadBar').classList.add('hidden');
+      document.getElementById('progressSection').classList.add('hidden');
+      document.getElementById('loadingState').classList.remove('hidden');
+      document.getElementById('loadBtn').disabled = true;
+
+      try {
+        const userId = tg.initDataUnsafe?.user?.id || '';
+        const resp = await fetch(`/api/playlist?url=${encodeURIComponent(url)}&user_id=${encodeURIComponent(userId)}`);
+        if (!resp.ok) throw new Error('Failed to fetch');
+        const data = await resp.json();
+
+        tracks = data.tracks;
+        selectedIds = new Set(tracks.map(t => t.id));
+
+        // Fill playlist header
+        document.getElementById('playlistCover').src = data.cover_url || '';
+        document.getElementById('playlistTitle').textContent = data.title;
+        document.getElementById('playlistMeta').textContent = `${data.total} tracks`;
+
+        // 100-track limit banner
+        const banner = document.getElementById('limitBanner');
+        if (data.total >= 100 && data.type === 'playlist') {
+          banner.classList.remove('hidden');
+        } else {
+          banner.classList.add('hidden');
+        }
+
+        // Render tracks
+        renderTracks();
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('playlistContent').classList.remove('hidden');
+        document.getElementById('downloadBar').classList.remove('hidden');
+        document.getElementById('selectAll').checked = true;
+        updateSelectedCount();
+      } catch (e) {
+        alert('Error loading playlist. Check the link and try again.');
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('emptyState').classList.remove('hidden');
+      } finally {
+        document.getElementById('loadBtn').disabled = false;
+      }
+    }
+
+    function renderTracks() {
+      const list = document.getElementById('trackList');
+      list.innerHTML = '';
+
+      tracks.forEach((track, idx) => {
+        const li = document.createElement('li');
+        li.className = 'track-item' + (selectedIds.has(track.id) ? ' selected' : '');
+        li.dataset.id = track.id;
+
+        const coverSmall = track.cover_url
+          ? track.cover_url.replace('/640/', '/64/').replace('ab67616d0000b273', 'ab67616d00004851')
+          : '';
+
+        li.innerHTML = `
+          <div class="cover-wrap" onclick="event.stopPropagation(); togglePreview('${track.id}', '${track.preview_url || ''}')">
+            <img src="${coverSmall || track.cover_url}" alt="" loading="lazy">
+            <div class="play-overlay">${track.preview_url ? '▶' : ''}</div>
+          </div>
+          <div class="track-info">
+            <div class="title">${escapeHtml(track.title)}</div>
+            <div class="artist">${escapeHtml(track.artist)}</div>
+          </div>
+          <span class="track-dur">${fmt(track.duration_sec)}</span>
+          <div class="track-check"></div>
+        `;
+
+        li.addEventListener('click', () => toggleTrack(track.id));
+        list.appendChild(li);
+      });
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    function toggleTrack(id) {
+      if (selectedIds.has(id)) {
+        selectedIds.delete(id);
+      } else {
+        selectedIds.add(id);
+      }
+      // Update visual
+      document.querySelectorAll('.track-item').forEach(el => {
+        el.classList.toggle('selected', selectedIds.has(el.dataset.id));
+      });
+      document.getElementById('selectAll').checked = selectedIds.size === tracks.length;
+      updateSelectedCount();
+    }
+
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      if (checked) {
+        selectedIds = new Set(tracks.map(t => t.id));
+      } else {
+        selectedIds.clear();
+      }
+      document.querySelectorAll('.track-item').forEach(el => {
+        el.classList.toggle('selected', selectedIds.has(el.dataset.id));
+      });
+      updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+      const n = selectedIds.size;
+      document.getElementById('selectedCount').textContent = `${n} selected`;
+      const btn = document.getElementById('downloadBtn');
+      btn.textContent = `Download selected (${n})`;
+      btn.disabled = n === 0;
+    }
+
+    function togglePreview(id, previewUrl) {
+      if (!previewUrl) return;
+
+      // Toggle off if same track
+      if (currentPreviewId === id) {
+        player.pause();
+        currentPreviewId = null;
+        document.querySelectorAll('.cover-wrap').forEach(el => el.classList.remove('playing'));
+        return;
+      }
+
+      currentPreviewId = id;
+      player.src = previewUrl;
+      player.play();
+
+      document.querySelectorAll('.cover-wrap').forEach(el => el.classList.remove('playing'));
+      const item = document.querySelector(`.track-item[data-id="${id}"] .cover-wrap`);
+      if (item) item.classList.add('playing');
+
+      player.onended = () => {
+        currentPreviewId = null;
+        document.querySelectorAll('.cover-wrap').forEach(el => el.classList.remove('playing'));
+      };
+    }
+
+    async function startDownload() {
+      if (selectedIds.size === 0) return;
+
+      const selectedTracks = tracks.filter(t => selectedIds.has(t.id));
+      const chatId = tg.initDataUnsafe?.user?.id;
+
+      if (!chatId) {
+        alert('Cannot determine your Telegram user ID. Please open this app from Telegram.');
+        return;
+      }
+
+      // Disable button, show progress
+      document.getElementById('downloadBtn').disabled = true;
+      document.getElementById('downloadBtn').textContent = 'Downloading...';
+      document.getElementById('progressSection').classList.remove('hidden');
+
+      try {
+        const resp = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            tracks: selectedTracks,
+          }),
+        });
+
+        if (!resp.ok) throw new Error('Download request failed');
+        const { job_id } = await resp.json();
+
+        // Listen to SSE for progress
+        const evtSource = new EventSource(`/api/status/${job_id}`);
+        evtSource.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          const pct = data.total > 0 ? Math.round((data.current / data.total) * 100) : 0;
+
+          document.getElementById('progressBarFill').style.width = `${pct}%`;
+          document.getElementById('progressTrackName').textContent =
+            data.current_track ? `Downloading: ${data.current_track}` : 'Preparing...';
+          document.getElementById('progressStats').textContent =
+            `${data.current} / ${data.total} (${data.success} sent)`;
+
+          if (data.status === 'completed' || data.status === 'cancelled') {
+            evtSource.close();
+            document.getElementById('progressBarFill').style.width = '100%';
+            document.getElementById('progressTrackName').textContent =
+              `Done! ${data.success} of ${data.total} tracks sent to your chat.`;
+            document.getElementById('downloadBtn').textContent = 'Download selected (' + selectedIds.size + ')';
+            document.getElementById('downloadBtn').disabled = false;
+
+            // Haptic feedback
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+          }
+        };
+
+        evtSource.onerror = () => {
+          evtSource.close();
+          document.getElementById('downloadBtn').textContent = 'Download selected (' + selectedIds.size + ')';
+          document.getElementById('downloadBtn').disabled = false;
+        };
+      } catch (e) {
+        alert('Error starting download: ' + e.message);
+        document.getElementById('downloadBtn').textContent = 'Download selected (' + selectedIds.size + ')';
+        document.getElementById('downloadBtn').disabled = false;
+      }
+    }
+
+    // Handle paste from clipboard on mobile
+    document.getElementById('urlInput').addEventListener('paste', () => {
+      setTimeout(() => {
+        const val = document.getElementById('urlInput').value;
+        if (val.includes('open.spotify.com') || val.includes('spotify:')) {
+          loadPlaylist();
+        }
+      }, 100);
+    });
+  </script>
+</body>
+</html>
