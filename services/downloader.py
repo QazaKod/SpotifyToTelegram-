@@ -26,6 +26,11 @@ def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
         "extract_flat": True,
         "nocheckcertificate": True,
         "extractor_retries": 1,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios", "android", "mweb"]
+            }
+        },
     }
 
     selected_video_url = None
@@ -94,6 +99,11 @@ def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
         "buffersize": 1024 * 64,
         "http_chunk_size": 10485760,
         "retries": 3,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios", "android", "mweb"]
+            }
+        },
     }
 
     try:
