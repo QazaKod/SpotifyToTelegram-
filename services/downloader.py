@@ -58,8 +58,8 @@ def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
     }
 
     sources = [
-        {"name": "youtube", "prefix": "ytsearch5:"},
-        {"name": "soundcloud", "prefix": "scsearch5:"}
+        {"name": "soundcloud", "prefix": "scsearch5:"},
+        {"name": "youtube", "prefix": "ytsearch5:"}
     ]
 
     for source in sources:
