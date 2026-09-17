@@ -25,6 +25,7 @@ class DownloadJob:
     status: str = "running"  # "running", "paused", "stopped", "completed"
     task: Optional[asyncio.Task] = None
     pause_event: asyncio.Event = field(default_factory=asyncio.Event)
+    spam_pause_until: float = 0.0
 
     def __post_init__(self):
         self.pause_event.set()  # изначально не на паузе
@@ -205,6 +206,12 @@ class JobManager:
                 if job.status == "stopped":
                     break
 
+                # Спам пауза
+                now = time.time()
+                if now < job.spam_pause_until:
+                    await update_status("Сервера под нагрузкой, ожидание 2 мин...")
+                    await asyncio.sleep(job.spam_pause_until - now)
+
                 try:
                     idx = queue.get_nowait()
                 except asyncio.QueueEmpty:
@@ -221,6 +228,9 @@ class JobManager:
                     if ok:
                         async with lock:
                             job.success_count += 1
+                            # Ставим всех воркеров на паузу 120 сек каждые 30 треков (для custom)
+                            if job.success_count > 0 and job.success_count % 30 == 0 and job.collection.id.startswith("custom_"):
+                                job.spam_pause_until = time.time() + 120.0
                 except Exception as e:
                     logger.error(f"Ошибка при скачивании трека {track.title}: {e}")
                 finally:

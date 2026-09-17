@@ -14,14 +14,11 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def extract_spotify_url(text: str) -> str:
+def extract_all_spotify_urls(text: str) -> list[str]:
     """
-    Находит ссылку на Spotify в переданном сообщении.
+    Находит все ссылки на Spotify в переданном сообщении.
     """
-    match = re.search(r"(https?://open\.spotify\.com/[^\s]+|spotify:[a-zA-Z0-9:]+)", text)
-    if match:
-        return match.group(0)
-    return ""
+    return re.findall(r"(https?://open\.spotify\.com/[^\s]+|spotify:[a-zA-Z0-9:]+)", text)
 
 
 @router.message(Command("download"))
@@ -33,12 +30,12 @@ async def handle_download_command(message: types.Message, bot: Bot):
         )
         return
 
-    url = extract_spotify_url(args[1])
-    if not url:
+    urls = extract_all_spotify_urls(args[1])
+    if not urls:
         await message.answer("❌ Ссылка на Spotify не найдена в сообщении. Пожалуйста, проверьте формат.")
         return
 
-    await process_spotify_url(message, bot, url)
+    await process_multiple_spotify_urls(message, bot, urls)
 
 
 @router.message(Command("stop"))
@@ -113,11 +110,68 @@ async def handle_spotify_link(message: types.Message, bot: Bot):
     if message.text and message.text.startswith(("/sync", "/download")):
         return
 
-    url = extract_spotify_url(message.text)
-    if not url:
+    urls = extract_all_spotify_urls(message.text)
+    if not urls:
         return
 
-    await process_spotify_url(message, bot, url)
+    await process_multiple_spotify_urls(message, bot, urls)
+
+
+async def process_multiple_spotify_urls(message: types.Message, bot: Bot, urls: list[str], force: bool = False):
+    if len(urls) == 1:
+        await process_spotify_url(message, bot, urls[0], force)
+        return
+
+    # Проверяем, нет ли уже активной загрузки
+    if JobManager.has_active_job(message.chat.id):
+        await message.answer(
+            "⚠️ В этом чате уже идет или приостановлена загрузка.\n"
+            "Вы можете поставить её на паузу или остановить кнопкой под статусом, либо командой /stop."
+        )
+        return
+
+    status_msg = await message.answer(f"🔍 Найдено {len(urls)} ссылок. Создаю виртуальный плейлист...")
+
+    # Регистрируем чат в БД
+    is_channel = message.chat.type in ("channel", "supergroup")
+    await Repository.get_or_create_chat(message.chat.id, is_channel=is_channel)
+
+    # Создаем виртуальный SpotifyCollection
+    from services.spotify import SpotifyCollection, SpotifyTrack
+    
+    dummy_tracks = []
+    for i, u in enumerate(urls):
+        dummy_tracks.append(
+            SpotifyTrack(
+                id=u,  # URL храним в id
+                title="LazyTrack",
+                artist_str="LazyArtist",
+                album="Unknown",
+                release_year="",
+                duration_sec=0,
+                cover_url=""
+            )
+        )
+
+    collection = SpotifyCollection(
+        type="playlist",
+        id=f"custom_{message.message_id}",
+        title=f"Пользовательский список ({len(urls)} треков)",
+        cover_url="",
+        tracks=dummy_tracks
+    )
+
+    await status_msg.edit_text(
+        f"📑 **«{collection.title}»**\n\n⏳ Начинаем выгрузку порциями (защита от спама Spotify включена)...",
+        reply_markup=get_running_keyboard(),
+    )
+
+    await JobManager.start_job(
+        chat_id=message.chat.id,
+        collection=collection,
+        status_msg_id=status_msg.message_id,
+        bot=bot,
+    )
 
 
 async def process_spotify_url(message: types.Message, bot: Bot, url: str, force: bool = False):
@@ -137,6 +191,7 @@ async def process_spotify_url(message: types.Message, bot: Bot, url: str, force:
             "3. Отправьте боту ссылку на созданный плейлист!\n\n"
             "Или нажмите кнопку ниже, чтобы скачать текущую версию:"
         )
+        from bot.keyboards.download import get_personalized_mix_keyboard
         await message.answer(text, reply_markup=get_personalized_mix_keyboard(parsed[1]))
         return
 

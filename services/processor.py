@@ -29,6 +29,15 @@ async def process_and_send_track(
     5. Сохранение telegram_file_id в базу данных
     6. Гарантированное удаление временных файлов (try...finally)
     """
+    if track.title == "LazyTrack" and track.artist_str == "LazyArtist" and track.id.startswith("http"):
+        from services.spotify import fetch_spotify_data
+        real_collection = await fetch_spotify_data(track.id)
+        if real_collection and real_collection.tracks:
+            track = real_collection.tracks[0]
+        else:
+            logger.error(f"Не удалось получить данные о треке по ссылке: {track.id}")
+            return False
+
     # 1. Проверяем кэш базы данных
     cached_file_id = await Repository.get_cached_file_id(track.id)
     if cached_file_id:
