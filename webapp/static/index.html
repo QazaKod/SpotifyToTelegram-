@@ -274,24 +274,24 @@
 
   <div class="header">
     <h1>🎵 SpotifyToTelegram</h1>
-    <p>Insert a Spotify link to preview and download tracks</p>
+    <p>Вставьте ссылку Spotify или напишите название песни</p>
   </div>
 
   <div class="search-box">
-    <input type="text" id="urlInput" placeholder="https://open.spotify.com/playlist/..." autocomplete="off">
-    <button id="loadBtn" onclick="loadPlaylist()">Load</button>
+    <input type="text" id="urlInput" placeholder="Ссылка или название (Miyagi Тамада)" autocomplete="off">
+    <button id="loadBtn" onclick="loadPlaylist()">Поиск</button>
   </div>
 
   <!-- Empty state -->
   <div id="emptyState" class="empty-state">
     <div class="icon">🎧</div>
-    <p>Paste a Spotify link above<br>to see the track list</p>
+    <p>Вставьте ссылку Spotify или название трека,<br>чтобы начать загрузку</p>
   </div>
 
   <!-- Loading -->
   <div id="loadingState" class="loading hidden">
     <div class="spinner"></div>
-    <p>Loading playlist...</p>
+    <p id="loadingText">Загрузка...</p>
   </div>
 
   <!-- Playlist content -->
@@ -331,7 +331,7 @@
 
   <!-- Bottom download button -->
   <div class="download-bar hidden" id="downloadBar">
-    <button id="downloadBtn" onclick="startDownload()">Download selected (0)</button>
+    <button id="downloadBtn" onclick="startDownload()">Отправить в чат (0)</button>
   </div>
 
   <audio id="previewPlayer" preload="none"></audio>
@@ -353,29 +353,52 @@
     }
 
     async function loadPlaylist() {
-      const url = document.getElementById('urlInput').value.trim();
-      if (!url) return;
+      const inputVal = document.getElementById('urlInput').value.trim();
+      if (!inputVal) return;
 
+      const isUrl = inputVal.includes('http') || inputVal.includes('spotify:');
+      
       document.getElementById('emptyState').classList.add('hidden');
       document.getElementById('playlistContent').classList.add('hidden');
       document.getElementById('downloadBar').classList.add('hidden');
       document.getElementById('progressSection').classList.add('hidden');
       document.getElementById('loadingState').classList.remove('hidden');
+      document.getElementById('loadingText').textContent = isUrl ? 'Загрузка плейлиста...' : 'Поиск треков...';
       document.getElementById('loadBtn').disabled = true;
 
       try {
         const userId = tg.initDataUnsafe?.user?.id || '';
-        const resp = await fetch(`/api/playlist?url=${encodeURIComponent(url)}&user_id=${encodeURIComponent(userId)}`);
+        const endpoint = isUrl 
+          ? `/api/playlist?url=${encodeURIComponent(inputVal)}&user_id=${encodeURIComponent(userId)}`
+          : `/api/search?q=${encodeURIComponent(inputVal)}`;
+          
+        const resp = await fetch(endpoint);
         if (!resp.ok) throw new Error('Failed to fetch');
         const data = await resp.json();
 
         tracks = data.tracks;
-        selectedIds = new Set(tracks.map(t => t.id));
+        
+        // If it was a text search, only select the top result by default instead of all.
+        if (isUrl) {
+            selectedIds = new Set(tracks.map(t => t.id));
+        } else {
+            selectedIds = new Set(tracks.length > 0 ? [tracks[0].id] : []);
+        }
 
         // Fill playlist header
-        document.getElementById('playlistCover').src = data.cover_url || '';
+        const coverImg = document.getElementById('playlistCover');
+        if (data.cover_url) {
+            coverImg.src = data.cover_url;
+            coverImg.style.display = 'block';
+        } else if (data.type === 'search' && tracks.length > 0) {
+            coverImg.src = tracks[0].cover_url || '';
+            coverImg.style.display = tracks[0].cover_url ? 'block' : 'none';
+        } else {
+            coverImg.style.display = 'none';
+        }
+        
         document.getElementById('playlistTitle').textContent = data.title;
-        document.getElementById('playlistMeta').textContent = `${data.total} tracks`;
+        document.getElementById('playlistMeta').textContent = `${data.total} треков найдено`;
 
         // 100-track limit banner
         const banner = document.getElementById('limitBanner');
@@ -391,10 +414,10 @@
         document.getElementById('loadingState').classList.add('hidden');
         document.getElementById('playlistContent').classList.remove('hidden');
         document.getElementById('downloadBar').classList.remove('hidden');
-        document.getElementById('selectAll').checked = true;
+        document.getElementById('selectAll').checked = isUrl;
         updateSelectedCount();
       } catch (e) {
-        alert('Error loading playlist. Check the link and try again.');
+        alert('Ошибка. Проверьте ссылку или запрос и попробуйте снова.');
         document.getElementById('loadingState').classList.add('hidden');
         document.getElementById('emptyState').classList.remove('hidden');
       } finally {
@@ -468,9 +491,9 @@
 
     function updateSelectedCount() {
       const n = selectedIds.size;
-      document.getElementById('selectedCount').textContent = `${n} selected`;
+      document.getElementById('selectedCount').textContent = `Выбрано: ${n}`;
       const btn = document.getElementById('downloadBtn');
-      btn.textContent = `Download selected (${n})`;
+      btn.textContent = `Отправить в чат (${n})`;
       btn.disabled = n === 0;
     }
 
@@ -506,13 +529,13 @@
       const chatId = tg.initDataUnsafe?.user?.id;
 
       if (!chatId) {
-        alert('Cannot determine your Telegram user ID. Please open this app from Telegram.');
+        alert('Не удалось определить ID чата. Откройте приложение через Telegram.');
         return;
       }
 
       // Disable button, show progress
       document.getElementById('downloadBtn').disabled = true;
-      document.getElementById('downloadBtn').textContent = 'Downloading...';
+      document.getElementById('downloadBtn').textContent = 'Загрузка...';
       document.getElementById('progressSection').classList.remove('hidden');
 
       try {
@@ -536,16 +559,16 @@
 
           document.getElementById('progressBarFill').style.width = `${pct}%`;
           document.getElementById('progressTrackName').textContent =
-            data.current_track ? `Downloading: ${data.current_track}` : 'Preparing...';
+            data.current_track ? `Отправка: ${data.current_track}` : 'Подготовка...';
           document.getElementById('progressStats').textContent =
-            `${data.current} / ${data.total} (${data.success} sent)`;
+            `${data.current} / ${data.total} (отправлено ${data.success})`;
 
           if (data.status === 'completed' || data.status === 'cancelled') {
             evtSource.close();
             document.getElementById('progressBarFill').style.width = '100%';
             document.getElementById('progressTrackName').textContent =
-              `Done! ${data.success} of ${data.total} tracks sent to your chat.`;
-            document.getElementById('downloadBtn').textContent = 'Download selected (' + selectedIds.size + ')';
+              `Готово! Отправлено ${data.success} из ${data.total} треков.`;
+            document.getElementById('downloadBtn').textContent = 'Отправить в чат (' + selectedIds.size + ')';
             document.getElementById('downloadBtn').disabled = false;
 
             // Haptic feedback
@@ -555,12 +578,12 @@
 
         evtSource.onerror = () => {
           evtSource.close();
-          document.getElementById('downloadBtn').textContent = 'Download selected (' + selectedIds.size + ')';
+          document.getElementById('downloadBtn').textContent = 'Отправить в чат (' + selectedIds.size + ')';
           document.getElementById('downloadBtn').disabled = false;
         };
       } catch (e) {
-        alert('Error starting download: ' + e.message);
-        document.getElementById('downloadBtn').textContent = 'Download selected (' + selectedIds.size + ')';
+        alert('Ошибка при запуске скачивания: ' + e.message);
+        document.getElementById('downloadBtn').textContent = 'Отправить в чат (' + selectedIds.size + ')';
         document.getElementById('downloadBtn').disabled = false;
       }
     }

@@ -58,6 +58,59 @@ async def handle_playlist(request: web.Request) -> web.Response:
     })
 
 
+async def handle_search(request: web.Request) -> web.Response:
+    query = request.query.get("q", "").strip()
+    if not query:
+        return web.json_response({"error": "Missing 'q' parameter"}, status=400)
+    
+    import aiohttp
+    
+    try:
+        url = "https://itunes.apple.com/search"
+        params = {
+            "term": query,
+            "entity": "song",
+            "limit": 15
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, timeout=10) as resp:
+                if resp.status != 200:
+                    return web.json_response({"error": "Failed to search iTunes API"}, status=500)
+                data = await resp.json()
+                
+        results = data.get("results", [])
+        tracks_data = []
+        for item in results:
+            track_id = f"itunes_{item.get('trackId')}"
+            cover_url = item.get("artworkUrl100", "")
+            if cover_url:
+                cover_url = cover_url.replace("100x100bb", "600x600bb")
+                
+            tracks_data.append({
+                "id": track_id,
+                "title": item.get("trackName", "Unknown"),
+                "artist": item.get("artistName", "Unknown"),
+                "album": item.get("collectionName", ""),
+                "duration_sec": item.get("trackTimeMillis", 0) // 1000,
+                "cover_url": cover_url,
+                "preview_url": item.get("previewUrl", "")
+            })
+            
+        return web.json_response({
+            "type": "search",
+            "id": f"search_{uuid.uuid4().hex[:8]}",
+            "title": f"Поиск: {query}",
+            "cover_url": "",
+            "total": len(tracks_data),
+            "tracks": tracks_data,
+        })
+        
+    except Exception as e:
+        logger.error(f"Search API error: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+
 async def handle_download(request: web.Request) -> web.Response:
     bot = request.app.get("bot")
     if not bot:
@@ -279,6 +332,7 @@ def create_webapp(bot=None) -> web.Application:
 
     app.router.add_get("/", handle_index)
     app.router.add_get("/api/playlist", handle_playlist)
+    app.router.add_get("/api/search", handle_search)
     app.router.add_post("/api/download", handle_download)
     app.router.add_get("/api/status/{job_id}", handle_status)
     app.router.add_post("/api/cancel/{job_id}", handle_cancel)
