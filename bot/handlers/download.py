@@ -117,6 +117,24 @@ async def handle_spotify_link(message: types.Message, bot: Bot):
     await process_multiple_spotify_urls(message, bot, urls)
 
 
+@router.message(F.document)
+async def handle_document(message: types.Message, bot: Bot):
+    if not message.document.file_name.endswith(".txt"):
+        return
+    
+    import io
+    file_in_memory = io.BytesIO()
+    await bot.download(message.document, destination=file_in_memory)
+    text = file_in_memory.getvalue().decode('utf-8', errors='ignore')
+    
+    urls = extract_all_spotify_urls(text)
+    if not urls:
+        await message.answer("❌ Ссылки на Spotify не найдены в файле.")
+        return
+
+    await process_multiple_spotify_urls(message, bot, urls)
+
+
 async def process_multiple_spotify_urls(message: types.Message, bot: Bot, urls: list[str], force: bool = False):
     if len(urls) == 1:
         await process_spotify_url(message, bot, urls[0], force)
