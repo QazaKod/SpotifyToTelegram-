@@ -20,6 +20,13 @@ def extract_all_spotify_urls(text: str) -> list[str]:
     """
     return re.findall(r"(https?://open\.spotify\.com/[^\s]+|spotify:[a-zA-Z0-9:]+)", text)
 
+def extract_spotify_url(text: str) -> str:
+    """
+    Находит первую ссылку на Spotify (для обратной совместимости с /sync).
+    """
+    urls = extract_all_spotify_urls(text)
+    return urls[0] if urls else ""
+
 
 @router.message(Command("download"))
 async def handle_download_command(message: types.Message, bot: Bot):
