@@ -7,7 +7,10 @@ from typing import Dict, Optional
 
 from aiohttp import web
 
+import hashlib
+import secrets
 import config
+from db.repository import Repository
 from services.processor import process_and_send_track
 from services.spotify import fetch_spotify_data
 
@@ -200,6 +203,74 @@ async def handle_cancel(request: web.Request) -> web.Response:
     job["done"] = True
     return web.json_response({"status": "cancelled"})
 
+admin_sessions = {}
+
+def verify_admin(request):
+    token = request.cookies.get('admin_token')
+    if not token or token not in admin_sessions:
+        return False
+    import time
+    if admin_sessions[token] < time.time():
+        del admin_sessions[token]
+        return False
+    return True
+
+async def handle_admin_login_page(request: web.Request) -> web.FileResponse:
+    return web.FileResponse(STATIC_DIR / "admin" / "login.html")
+
+async def handle_admin_login(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+    
+    password = body.get("password")
+    if password == config.ADMIN_PASSWORD:
+        import time
+        token = secrets.token_urlsafe(32)
+        admin_sessions[token] = time.time() + 86400  # 24h
+        resp = web.json_response({"success": True})
+        resp.set_cookie('admin_token', token, max_age=86400, httponly=True)
+        return resp
+    else:
+        return web.json_response({"error": "Invalid password"}, status=401)
+
+async def handle_admin_dashboard(request: web.Request) -> web.Response:
+    if not verify_admin(request):
+        raise web.HTTPFound('/admin/')
+    return web.FileResponse(STATIC_DIR / "admin" / "dashboard.html")
+
+async def handle_admin_api_summary(request: web.Request) -> web.Response:
+    if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
+    return web.json_response(await Repository.get_stats_summary())
+
+async def handle_admin_api_downloads_by_day(request: web.Request) -> web.Response:
+    if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
+    return web.json_response(await Repository.get_downloads_by_day())
+
+async def handle_admin_api_downloads_by_hour(request: web.Request) -> web.Response:
+    if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
+    return web.json_response(await Repository.get_downloads_by_hour())
+
+async def handle_admin_api_top_tracks(request: web.Request) -> web.Response:
+    if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
+    return web.json_response(await Repository.get_top_tracks())
+
+async def handle_admin_api_top_artists(request: web.Request) -> web.Response:
+    if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
+    return web.json_response(await Repository.get_top_artists())
+
+async def handle_admin_api_top_genres(request: web.Request) -> web.Response:
+    if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
+    return web.json_response(await Repository.get_top_genres())
+
+async def handle_admin_api_sources(request: web.Request) -> web.Response:
+    if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
+    return web.json_response(await Repository.get_source_distribution())
+
+async def handle_admin_api_recent_users(request: web.Request) -> web.Response:
+    if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
+    return web.json_response(await Repository.get_recent_users())
 
 def create_webapp(bot=None) -> web.Application:
     app = web.Application()
@@ -211,6 +282,17 @@ def create_webapp(bot=None) -> web.Application:
     app.router.add_post("/api/download", handle_download)
     app.router.add_get("/api/status/{job_id}", handle_status)
     app.router.add_post("/api/cancel/{job_id}", handle_cancel)
+    app.router.add_get("/admin/", handle_admin_login_page)
+    app.router.add_post("/admin/login", handle_admin_login)
+    app.router.add_get("/admin/dashboard", handle_admin_dashboard)
+    app.router.add_get("/admin/api/summary", handle_admin_api_summary)
+    app.router.add_get("/admin/api/downloads-by-day", handle_admin_api_downloads_by_day)
+    app.router.add_get("/admin/api/downloads-by-hour", handle_admin_api_downloads_by_hour)
+    app.router.add_get("/admin/api/top-tracks", handle_admin_api_top_tracks)
+    app.router.add_get("/admin/api/top-artists", handle_admin_api_top_artists)
+    app.router.add_get("/admin/api/top-genres", handle_admin_api_top_genres)
+    app.router.add_get("/admin/api/sources", handle_admin_api_sources)
+    app.router.add_get("/admin/api/recent-users", handle_admin_api_recent_users)
     app.router.add_static("/static/", STATIC_DIR, name="static")
 
     return app

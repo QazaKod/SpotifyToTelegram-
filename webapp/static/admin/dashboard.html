@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дашборд - SpotifyToTelegram</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent: #1DB954;
+            --text-main: #ffffff;
+            --text-sec: #b3b3b3;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            background-color: #000000;
+            border-bottom: 1px solid #282828;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .logout-btn {
+            background-color: transparent;
+            color: var(--text-sec);
+            border: 1px solid var(--text-sec);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        .logout-btn:hover {
+            color: var(--text-main);
+            border-color: var(--text-main);
+        }
+        .container {
+            padding: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .card-title {
+            color: var(--text-sec);
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .card-value {
+            font-size: 32px;
+            font-weight: bold;
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        .tables-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            color: var(--text-sec);
+            border-bottom: 1px solid #282828;
+            padding: 12px 8px;
+            font-weight: normal;
+        }
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #282828;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            .tables-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 768px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎵 SpotifyToTelegram Admin</h1>
+        <button class="logout-btn" onclick="logout()">Выйти</button>
+    </header>
+    
+    <div class="container">
+        <!-- Summary Cards -->
+        <div class="summary-grid">
+            <div class="card">
+                <div class="card-title">👥 Пользователей</div>
+                <div class="card-value" id="total_users">-</div>
+            </div>
+            <div class="card">
+                <div class="card-title">🎵 Скачиваний</div>
+                <div class="card-value" id="total_downloads">-</div>
+            </div>
+            <div class="card">
+                <div class="card-title">✅ Успешность</div>
+                <div class="card-value" id="success_rate">-</div>
+            </div>
+            <div class="card">
+                <div class="card-title">📊 Сегодня</div>
+                <div class="card-value" id="today_downloads">-</div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+            <div class="card">
+                <div class="card-title">Скачивания за 30 дней</div>
+                <div class="chart-container">
+                    <canvas id="downloadsChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Активность по часам</div>
+                <div class="chart-container">
+                    <canvas id="hoursChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Топ жанров</div>
+                <div class="chart-container">
+                    <canvas id="genresChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Источники скачивания</div>
+                <div class="chart-container">
+                    <canvas id="sourcesChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tables Grid -->
+        <div class="tables-grid">
+            <div class="card">
+                <div class="card-title">🏆 Топ треков</div>
+                <div class="table-container">
+                    <table id="topTracksTable">
+                        <thead><tr><th>#</th><th>Трек</th><th>Артист</th><th>Скачиваний</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">🎤 Топ артистов</div>
+                <div class="table-container">
+                    <table id="topArtistsTable">
+                        <thead><tr><th>#</th><th>Артист</th><th>Скачиваний</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">👥 Пользователи</div>
+                <div class="table-container">
+                    <table id="recentUsersTable">
+                        <thead><tr><th>Username</th><th>Имя</th><th>Язык</th><th>Акт-ть</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            color: '#b3b3b3',
+            plugins: {
+                legend: { labels: { color: '#b3b3b3' } }
+            }
+        };
+
+        const gridOptions = {
+            color: 'rgba(255,255,255,0.1)'
+        };
+        const ticksOptions = { color: '#b3b3b3' };
+        
+        let charts = {};
+
+        async function fetchWithError(url) {
+            const res = await fetch(url);
+            if (res.status === 401) {
+                window.location.href = '/admin/';
+                throw new Error('Unauthorized');
+            }
+            return res.json();
+        }
+
+        async function loadData() {
+            try {
+                // Summary
+                const summary = await fetchWithError('/admin/api/summary');
+                document.getElementById('total_users').textContent = summary.total_users || 0;
+                document.getElementById('total_downloads').textContent = summary.total_downloads || 0;
+                const total = summary.total_downloads || 1;
+                const succ = summary.successful_downloads || 0;
+                document.getElementById('success_rate').textContent = ((succ / total) * 100).toFixed(1) + '%';
+                document.getElementById('today_downloads').textContent = summary.today_downloads || 0;
+
+                // Line Chart
+                const dailyData = await fetchWithError('/admin/api/downloads-by-day');
+                updateChart('downloadsChart', 'line', {
+                    labels: dailyData.labels,
+                    datasets: [{
+                        label: 'Скачивания',
+                        data: dailyData.data,
+                        borderColor: '#1DB954',
+                        backgroundColor: 'rgba(29, 185, 84, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                }, {
+                    ...chartOptions,
+                    scales: { 
+                        x: { grid: gridOptions, ticks: ticksOptions }, 
+                        y: { grid: gridOptions, ticks: ticksOptions } 
+                    }
+                });
+
+                // Bar Chart
+                const hourlyData = await fetchWithError('/admin/api/downloads-by-hour');
+                updateChart('hoursChart', 'bar', {
+                    labels: hourlyData.labels,
+                    datasets: [{
+                        label: 'Активность',
+                        data: hourlyData.data,
+                        backgroundColor: '#1DB954'
+                    }]
+                }, {
+                    ...chartOptions,
+                    scales: { 
+                        x: { grid: gridOptions, ticks: ticksOptions }, 
+                        y: { grid: gridOptions, ticks: ticksOptions } 
+                    }
+                });
+
+                // Doughnut Chart
+                const genresData = await fetchWithError('/admin/api/top-genres');
+                updateChart('genresChart', 'doughnut', {
+                    labels: genresData.labels,
+                    datasets: [{
+                        data: genresData.data,
+                        backgroundColor: ['#1DB954', '#1ed760', '#509bf5', '#f573a0', '#ffa42b', '#e8115b', '#148a3c', '#7c5cfc', '#2d46b9', '#e91429'],
+                        borderWidth: 0
+                    }]
+                }, chartOptions);
+
+                // Pie Chart
+                const sourcesData = await fetchWithError('/admin/api/sources');
+                const sourceColors = sourcesData.labels.map(l => {
+                    if(l.toLowerCase().includes('youtube')) return '#ff4444';
+                    if(l.toLowerCase().includes('soundcloud')) return '#ff8800';
+                    return '#1DB954';
+                });
+                updateChart('sourcesChart', 'pie', {
+                    labels: sourcesData.labels,
+                    datasets: [{
+                        data: sourcesData.data,
+                        backgroundColor: sourceColors,
+                        borderWidth: 0
+                    }]
+                }, chartOptions);
+
+                // Tables
+                const tracksData = await fetchWithError('/admin/api/top-tracks');
+                renderTable('topTracksTable', tracksData, (item, i) => `<tr><td>${i+1}</td><td>${item.track}</td><td>${item.artist}</td><td>${item.count}</td></tr>`);
+
+                const artistsData = await fetchWithError('/admin/api/top-artists');
+                renderTable('topArtistsTable', artistsData, (item, i) => `<tr><td>${i+1}</td><td>${item.artist}</td><td>${item.count}</td></tr>`);
+
+                const usersData = await fetchWithError('/admin/api/recent-users');
+                renderTable('recentUsersTable', usersData, item => `<tr><td>${item.username || '-'}</td><td>${item.name || '-'}</td><td>${item.language || '-'}</td><td>${new Date(item.last_activity).toLocaleString('ru-RU')}</td></tr>`);
+
+            } catch (err) {
+                console.error('Error fetching data:', err);
+            }
+        }
+
+        function updateChart(id, type, data, options) {
+            const ctx = document.getElementById(id).getContext('2d');
+            if (charts[id]) {
+                charts[id].destroy();
+            }
+            charts[id] = new Chart(ctx, { type, data, options });
+        }
+
+        function renderTable(id, data, rowRenderer) {
+            const tbody = document.querySelector(`#${id} tbody`);
+            tbody.innerHTML = (data || []).map(rowRenderer).join('');
+        }
+
+        function logout() {
+            document.cookie.split(";").forEach(function(c) { document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); });
+            window.location.href = '/admin/';
+        }
+
+        // Init and refresh loop
+        loadData();
+        setInterval(loadData, 60000);
+    </script>
+</body>
+</html>

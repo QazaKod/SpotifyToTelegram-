@@ -20,6 +20,7 @@ class DownloadJob:
     chat_id: int
     collection: SpotifyCollection
     status_msg_id: int
+    user_id: Optional[int] = None
     current_index: int = 0
     success_count: int = 0
     status: str = "running"  # "running", "paused", "stopped", "completed"
@@ -50,6 +51,7 @@ class JobManager:
         collection: SpotifyCollection,
         status_msg_id: int,
         bot: Bot,
+        user_id: Optional[int] = None,
     ) -> DownloadJob:
         # Если была старая задача, останавливаем
         if chat_id in cls._jobs:
@@ -59,6 +61,7 @@ class JobManager:
             chat_id=chat_id,
             collection=collection,
             status_msg_id=status_msg_id,
+            user_id=user_id,
         )
         cls._jobs[chat_id] = job
 
@@ -224,7 +227,7 @@ class JobManager:
                 await update_status(f"{track.artist_str} — {track.title}")
 
                 try:
-                    ok = await process_and_send_track(bot, job.chat_id, track)
+                    ok = await process_and_send_track(bot, job.chat_id, track, user_id=job.user_id)
                     if ok:
                         async with lock:
                             job.success_count += 1

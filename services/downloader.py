@@ -11,7 +11,7 @@ from services.spotify import SpotifyTrack
 logger = logging.getLogger(__name__)
 
 
-def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
+def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[tuple[Path, str]]:
     """
     Синхронная функция поиска и скачивания трека через yt-dlp.
     Вызывается в отдельном потоке (через asyncio.to_thread).
@@ -58,8 +58,8 @@ def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
     }
 
     sources = [
-        {"name": "soundcloud", "prefix": "scsearch5:"},
-        {"name": "youtube", "prefix": "ytsearch5:"}
+        {"name": "youtube", "prefix": "ytsearch5:"},
+        {"name": "soundcloud", "prefix": "scsearch5:"}
     ]
 
     for source in sources:
@@ -126,7 +126,7 @@ def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
             mp3_file = temp_dir / f"{file_id}.mp3"
             if mp3_file.exists():
                 logger.info(f"[{source['name']}] Трек успешно скачан: {mp3_file.name}")
-                return mp3_file
+                return (mp3_file, source["name"])
             else:
                 logger.error(f"[{source['name']}] Файл {mp3_file} не найден после конвертации")
         except Exception as e:
@@ -137,7 +137,7 @@ def _sync_download(track: SpotifyTrack, temp_dir: Path) -> Optional[Path]:
     return None
 
 
-async def download_track(track: SpotifyTrack, temp_dir: Optional[Path] = None) -> Optional[Path]:
+async def download_track(track: SpotifyTrack, temp_dir: Optional[Path] = None) -> Optional[tuple[Path, str]]:
     """
     Асинхронный вызов загрузки (выполняется в пуле потоков asyncio.to_thread).
     """

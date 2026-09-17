@@ -164,6 +164,15 @@ async def process_multiple_spotify_urls(message: types.Message, bot: Bot, urls: 
     # Создаем виртуальный SpotifyCollection
     from services.spotify import SpotifyCollection, SpotifyTrack
     
+    user_id = message.from_user.id if message.from_user else None
+    if message.from_user:
+        await Repository.get_or_create_user(
+            telegram_user_id=message.from_user.id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            language_code=message.from_user.language_code
+        )
+
     dummy_tracks = []
     for i, u in enumerate(urls):
         dummy_tracks.append(
@@ -196,6 +205,7 @@ async def process_multiple_spotify_urls(message: types.Message, bot: Bot, urls: 
         collection=collection,
         status_msg_id=status_msg.message_id,
         bot=bot,
+        user_id=user_id,
     )
 
 
@@ -235,6 +245,14 @@ async def process_spotify_url(message: types.Message, bot: Bot, url: str, force:
     await Repository.get_or_create_chat(message.chat.id, is_channel=is_channel)
 
     user_id = message.from_user.id if message.from_user else None
+    if message.from_user:
+        await Repository.get_or_create_user(
+            telegram_user_id=message.from_user.id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            language_code=message.from_user.language_code
+        )
+
     collection = await fetch_spotify_data(url, user_id=user_id)
     if not collection or not collection.tracks:
         await status_msg.edit_text("❌ Не удалось извлечь треки. Убедитесь, что плейлист или трек является публичным.")
@@ -246,7 +264,7 @@ async def process_spotify_url(message: types.Message, bot: Bot, url: str, force:
     if collection.type == "track":
         track = collection.tracks[0]
         await status_msg.edit_text(f"⏳ Скачиваю: **{track.artist_str} — {track.title}**...")
-        success = await process_and_send_track(bot, message.chat.id, track)
+        success = await process_and_send_track(bot, message.chat.id, track, user_id=user_id)
         if success:
             await status_msg.delete()
         else:
@@ -269,4 +287,5 @@ async def process_spotify_url(message: types.Message, bot: Bot, url: str, force:
         collection=collection,
         status_msg_id=status_msg.message_id,
         bot=bot,
+        user_id=user_id,
     )

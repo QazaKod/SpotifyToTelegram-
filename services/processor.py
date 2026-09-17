@@ -19,6 +19,7 @@ async def process_and_send_track(
     chat_id: int,
     track: SpotifyTrack,
     playlist_db_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> bool:
     """
     Полный сквозной пайплайн обработки одного трека:
@@ -29,6 +30,14 @@ async def process_and_send_track(
     5. Сохранение telegram_file_id в базу данных
     6. Гарантированное удаление временных файлов (try...finally)
     """
+    user_db_id = None
+    if user_id:
+        try:
+            user = await Repository.get_or_create_user(telegram_user_id=user_id)
+            user_db_id = user.id
+        except Exception as e:
+            logger.warning(f"Ошибка при регистрации пользователя: {e}")
+
     if track.title == "LazyTrack" and track.artist_str == "LazyArtist" and track.id.startswith("http"):
         from services.spotify import fetch_spotify_data
         real_collection = await fetch_spotify_data(track.id)
@@ -52,6 +61,10 @@ async def process_and_send_track(
             )
             if playlist_db_id:
                 await Repository.save_sent_track(track.id, cached_file_id, playlist_id=playlist_db_id)
+            try:
+                await Repository.log_download(user_db_id, track.id, track.title, track.artist_str, track.duration_sec, "cache", True)
+            except Exception:
+                pass
             return True
         except Exception as e:
             logger.warning(f"Не удалось отправить трек из кэша (возможно устарел file_id): {e}. Скачиваем заново.")
@@ -59,14 +72,20 @@ async def process_and_send_track(
     # 2. Скачивание под семафором (не более N параллельных загрузок)
     mp3_path: Optional[Path] = None
     cover_path: Optional[Path] = None
+    source: str = "unknown"
 
     try:
         async with download_semaphore:
             logger.info(f"Начало загрузки: {track.artist_str} - {track.title}")
-            mp3_path = await download_track(track)
-            if not mp3_path:
+            result = await download_track(track)
+            if not result:
                 logger.error(f"Не удалось скачать трек: {track.artist_str} - {track.title}")
+                try:
+                    await Repository.log_download(user_db_id, track.id, track.title, track.artist_str, track.duration_sec, "unknown", False)
+                except Exception:
+                    pass
                 return False
+            mp3_path, source = result
 
             # 3. Вшивание тегов и скачивание обложки
             cover_path = await tag_mp3(mp3_path, track)
@@ -93,10 +112,26 @@ async def process_and_send_track(
             )
 
         logger.info(f"Трек успешно отправлен: {track.artist_str} - {track.title}")
+        try:
+            await Repository.log_download(user_db_id, track.id, track.title, track.artist_str, track.duration_sec, source, True)
+        except Exception:
+            pass
+
+        try:
+            from services.lastfm import fetch_artist_genre
+            import asyncio
+            asyncio.create_task(fetch_artist_genre(track.artist_str.split(',')[0].strip()))
+        except Exception:
+            pass
+
         return True
 
     except Exception as e:
         logger.exception(f"Ошибка при обработке и отправке трека '{track.artist_str} - {track.title}': {e}")
+        try:
+            await Repository.log_download(user_db_id, track.id, track.title, track.artist_str, track.duration_sec, "unknown", False)
+        except Exception:
+            pass
         return False
     finally:
         # 6. Гарантированная очистка временных файлов

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.database import Base
@@ -42,3 +42,35 @@ class SentTrack(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     playlist: Mapped[Optional["SyncPlaylist"]] = relationship(back_populates="sent_tracks")
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    telegram_user_id = Column(BigInteger, unique=True, index=True, nullable=False)
+    username = Column(String(128), nullable=True)
+    first_name = Column(String(128), nullable=True)
+    language_code = Column(String(10), nullable=True)
+    first_seen_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_active_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class DownloadLog(Base):
+    __tablename__ = "download_logs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    spotify_track_id = Column(String(64), index=True, nullable=False)
+    track_title = Column(String(256), nullable=False)
+    track_artist = Column(String(256), nullable=False)
+    track_duration_sec = Column(Integer, nullable=True)
+    source = Column(String(32), nullable=False)  # youtube, soundcloud, cache
+    success = Column(Boolean, default=True, nullable=False)
+    downloaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ArtistGenre(Base):
+    __tablename__ = "artist_genres"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    artist_name = Column(String(256), unique=True, index=True, nullable=False)
+    genres = Column(String(512), nullable=True)
+    fetched_at = Column(DateTime, default=datetime.utcnow, nullable=False)

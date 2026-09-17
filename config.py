@@ -45,3 +45,6 @@ def setup_ffmpeg():
     return False
 
 setup_ffmpeg()
+
+LASTFM_API_KEY = os.getenv("LASTFM_API_KEY", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin").strip()

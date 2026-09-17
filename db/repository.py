@@ -1,9 +1,10 @@
-from datetime import datetime
+from collections import Counter
+from datetime import datetime, timedelta
 from typing import List, Optional
-from sqlalchemy import select
+from sqlalchemy import select, func, distinct
 
 from db.database import async_session
-from db.models import Chat, SentTrack, SyncPlaylist
+from db.models import Chat, SentTrack, SyncPlaylist, User, DownloadLog, ArtistGenre
 
 
 class Repository:
@@ -92,3 +93,174 @@ class Repository:
             if pl:
                 pl.last_synced_at = datetime.utcnow()
                 await session.commit()
+
+    @staticmethod
+    async def get_or_create_user(telegram_user_id: int, username: Optional[str] = None, first_name: Optional[str] = None, language_code: Optional[str] = None) -> User:
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.telegram_user_id == telegram_user_id))
+            user = result.scalar_one_or_none()
+            if not user:
+                user = User(
+                    telegram_user_id=telegram_user_id,
+                    username=username,
+                    first_name=first_name,
+                    language_code=language_code
+                )
+                session.add(user)
+            else:
+                user.last_active_at = datetime.utcnow()
+                if username is not None:
+                    user.username = username
+                if first_name is not None:
+                    user.first_name = first_name
+                if language_code is not None:
+                    user.language_code = language_code
+            await session.commit()
+            await session.refresh(user)
+            return user
+
+    @staticmethod
+    async def log_download(user_db_id: Optional[int], spotify_track_id: str, track_title: str, track_artist: str, track_duration_sec: int, source: str, success: bool) -> DownloadLog:
+        async with async_session() as session:
+            log = DownloadLog(
+                user_id=user_db_id,
+                spotify_track_id=spotify_track_id,
+                track_title=track_title,
+                track_artist=track_artist,
+                track_duration_sec=track_duration_sec,
+                source=source,
+                success=success,
+                downloaded_at=datetime.utcnow()
+            )
+            session.add(log)
+            await session.commit()
+            await session.refresh(log)
+            return log
+
+    @staticmethod
+    async def cache_artist_genre(artist_name: str, genres: str) -> ArtistGenre:
+        async with async_session() as session:
+            result = await session.execute(select(ArtistGenre).where(ArtistGenre.artist_name == artist_name))
+            ag = result.scalar_one_or_none()
+            if not ag:
+                ag = ArtistGenre(artist_name=artist_name, genres=genres)
+                session.add(ag)
+            else:
+                ag.genres = genres
+                ag.fetched_at = datetime.utcnow()
+            await session.commit()
+            await session.refresh(ag)
+            return ag
+
+    @staticmethod
+    async def get_cached_genre(artist_name: str) -> Optional[str]:
+        async with async_session() as session:
+            result = await session.execute(select(ArtistGenre.genres).where(ArtistGenre.artist_name == artist_name))
+            return result.scalar_one_or_none()
+
+    @classmethod
+    async def get_stats_summary(cls) -> dict:
+        async with async_session() as session:
+            total_users = (await session.execute(select(func.count(User.id)))).scalar() or 0
+            total_downloads = (await session.execute(select(func.count(DownloadLog.id)))).scalar() or 0
+            successful = (await session.execute(select(func.count(DownloadLog.id)).where(DownloadLog.success == True))).scalar() or 0
+            unique_tracks = (await session.execute(select(func.count(distinct(DownloadLog.spotify_track_id))))).scalar() or 0
+            today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_downloads = (await session.execute(select(func.count(DownloadLog.id)).where(DownloadLog.downloaded_at >= today))).scalar() or 0
+            return {
+                "total_users": total_users,
+                "total_downloads": total_downloads,
+                "successful_downloads": successful,
+                "unique_tracks": unique_tracks,
+                "today_downloads": today_downloads
+            }
+
+    @classmethod
+    async def get_downloads_by_day(cls, days=30) -> list[dict]:
+        start_date = datetime.utcnow() - timedelta(days=days)
+        async with async_session() as session:
+            result = await session.execute(
+                select(func.date(DownloadLog.downloaded_at).label('date'), func.count(DownloadLog.id).label('count'))
+                .where(DownloadLog.downloaded_at >= start_date)
+                .group_by('date')
+                .order_by('date')
+            )
+            return [{"date": row.date, "count": row.count} for row in result.all()]
+
+    @classmethod
+    async def get_downloads_by_hour(cls) -> list[dict]:
+        async with async_session() as session:
+            result = await session.execute(
+                select(func.strftime('%H', DownloadLog.downloaded_at).label('hour'), func.count(DownloadLog.id).label('count'))
+                .group_by('hour')
+                .order_by('hour')
+            )
+            # Fill all 24 hours
+            counts = {int(row.hour): row.count for row in result.all() if row.hour is not None}
+            return [{"hour": i, "count": counts.get(i, 0)} for i in range(24)]
+
+    @classmethod
+    async def get_top_tracks(cls, limit=20) -> list[dict]:
+        async with async_session() as session:
+            result = await session.execute(
+                select(DownloadLog.track_title.label('title'), DownloadLog.track_artist.label('artist'), func.count(DownloadLog.id).label('count'))
+                .group_by(DownloadLog.spotify_track_id, DownloadLog.track_title, DownloadLog.track_artist)
+                .order_by(func.count(DownloadLog.id).desc())
+                .limit(limit)
+            )
+            return [{"title": row.title, "artist": row.artist, "count": row.count} for row in result.all()]
+
+    @classmethod
+    async def get_top_artists(cls, limit=20) -> list[dict]:
+        async with async_session() as session:
+            result = await session.execute(
+                select(DownloadLog.track_artist.label('artist'), func.count(DownloadLog.id).label('count'))
+                .group_by(DownloadLog.track_artist)
+                .order_by(func.count(DownloadLog.id).desc())
+                .limit(limit)
+            )
+            return [{"artist": row.artist, "count": row.count} for row in result.all()]
+
+    @classmethod
+    async def get_top_genres(cls, limit=15) -> list[dict]:
+        async with async_session() as session:
+            # Query all download_logs joined with artist_genres
+            result = await session.execute(
+                select(ArtistGenre.genres)
+                .select_from(DownloadLog)
+                .join(ArtistGenre, DownloadLog.track_artist == ArtistGenre.artist_name)
+            )
+            genre_counter = Counter()
+            for row in result.all():
+                if row.genres:
+                    genres = [g.strip() for g in row.genres.split(",")]
+                    genre_counter.update(genres)
+            return [{"genre": g, "count": c} for g, c in genre_counter.most_common(limit)]
+
+    @classmethod
+    async def get_source_distribution(cls) -> list[dict]:
+        async with async_session() as session:
+            result = await session.execute(
+                select(DownloadLog.source, func.count(DownloadLog.id).label('count'))
+                .group_by(DownloadLog.source)
+            )
+            return [{"source": row.source, "count": row.count} for row in result.all()]
+
+    @classmethod
+    async def get_recent_users(cls, limit=20) -> list[dict]:
+        async with async_session() as session:
+            result = await session.execute(
+                select(User.telegram_user_id, User.username, User.first_name, User.language_code, User.last_active_at)
+                .order_by(User.last_active_at.desc())
+                .limit(limit)
+            )
+            return [
+                {
+                    "telegram_user_id": row.telegram_user_id,
+                    "username": row.username,
+                    "first_name": row.first_name,
+                    "language_code": row.language_code,
+                    "last_active_at": row.last_active_at.isoformat() if row.last_active_at else None
+                }
+                for row in result.all()
+            ]
