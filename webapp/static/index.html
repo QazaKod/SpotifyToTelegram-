@@ -304,10 +304,15 @@
       </div>
     </div>
 
+    <!-- Local Filter Box -->
+    <div class="filter-box" style="padding: 0 16px 12px;">
+      <input type="text" id="filterInput" placeholder="🔍 Фильтр по названию или автору..." autocomplete="off" oninput="filterTracks()" style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: var(--text); font-size: 14px; outline: none;">
+    </div>
+
     <div class="controls">
       <label>
         <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
-        Select all
+        Выбрать видимые
       </label>
       <span class="selected-count" id="selectedCount">0 selected</span>
     </div>
@@ -365,6 +370,7 @@
       document.getElementById('loadingState').classList.remove('hidden');
       document.getElementById('loadingText').textContent = isUrl ? 'Загрузка плейлиста...' : 'Поиск треков...';
       document.getElementById('loadBtn').disabled = true;
+      document.getElementById('filterInput').value = ''; // Reset filter
 
       try {
         const userId = tg.initDataUnsafe?.user?.id || '';
@@ -414,7 +420,8 @@
         document.getElementById('loadingState').classList.add('hidden');
         document.getElementById('playlistContent').classList.remove('hidden');
         document.getElementById('downloadBar').classList.remove('hidden');
-        document.getElementById('selectAll').checked = isUrl;
+        
+        updateSelectAllCheckbox();
         updateSelectedCount();
       } catch (e) {
         alert('Ошибка. Проверьте ссылку или запрос и попробуйте снова.');
@@ -456,6 +463,22 @@
       });
     }
 
+    function filterTracks() {
+      const query = document.getElementById('filterInput').value.toLowerCase();
+      const items = document.querySelectorAll('.track-item');
+      
+      items.forEach(item => {
+        const id = item.dataset.id;
+        const track = tracks.find(t => t.id === id);
+        if (!track) return;
+        
+        const isMatch = track.title.toLowerCase().includes(query) || track.artist.toLowerCase().includes(query);
+        item.style.display = isMatch ? 'flex' : 'none';
+      });
+      
+      updateSelectAllCheckbox();
+    }
+
     function escapeHtml(text) {
       const d = document.createElement('div');
       d.textContent = text;
@@ -470,23 +493,42 @@
       }
       // Update visual
       document.querySelectorAll('.track-item').forEach(el => {
-        el.classList.toggle('selected', selectedIds.has(el.dataset.id));
+        if (el.dataset.id === id) {
+           el.classList.toggle('selected', selectedIds.has(id));
+        }
       });
-      document.getElementById('selectAll').checked = selectedIds.size === tracks.length;
+      updateSelectAllCheckbox();
       updateSelectedCount();
     }
 
     function toggleSelectAll() {
       const checked = document.getElementById('selectAll').checked;
-      if (checked) {
-        selectedIds = new Set(tracks.map(t => t.id));
-      } else {
-        selectedIds.clear();
-      }
-      document.querySelectorAll('.track-item').forEach(el => {
-        el.classList.toggle('selected', selectedIds.has(el.dataset.id));
+      const items = document.querySelectorAll('.track-item');
+      
+      items.forEach(item => {
+        if (item.style.display !== 'none') {
+          const id = item.dataset.id;
+          if (checked) {
+            selectedIds.add(id);
+            item.classList.add('selected');
+          } else {
+            selectedIds.delete(id);
+            item.classList.remove('selected');
+          }
+        }
       });
+      
       updateSelectedCount();
+    }
+    
+    function updateSelectAllCheckbox() {
+      const visibleItems = Array.from(document.querySelectorAll('.track-item')).filter(i => i.style.display !== 'none');
+      if (visibleItems.length === 0) {
+        document.getElementById('selectAll').checked = false;
+        return;
+      }
+      const allSelected = visibleItems.every(i => selectedIds.has(i.dataset.id));
+      document.getElementById('selectAll').checked = allSelected;
     }
 
     function updateSelectedCount() {
