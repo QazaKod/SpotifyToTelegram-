@@ -77,7 +77,7 @@ async def handle_search(request: web.Request) -> web.Response:
             async with session.get(url, params=params, timeout=10) as resp:
                 if resp.status != 200:
                     return web.json_response({"error": "Failed to search iTunes API"}, status=500)
-                data = await resp.json()
+                data = await resp.json(content_type=None)
                 
         results = data.get("results", [])
         tracks_data = []
@@ -557,7 +557,7 @@ async def handle_explore_genre(request: web.Request) -> web.Response:
             async with session.get(url, timeout=10) as resp:
                 if resp.status != 200:
                     return web.json_response({"error": "Failed to search iTunes API"}, status=500)
-                data = await resp.json()
+                data = await resp.json(content_type=None)
                 
         results = data.get("results", [])
         tracks_data = []
