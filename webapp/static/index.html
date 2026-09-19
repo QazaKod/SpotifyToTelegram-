@@ -7,336 +7,309 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg: var(--tg-theme-bg-color, #1a1a2e);
-      --text: var(--tg-theme-text-color, #e0e0e0);
-      --hint: var(--tg-theme-hint-color, #8a8a9a);
+      --bg: var(--tg-theme-bg-color, #121212);
+      --text: var(--tg-theme-text-color, #ffffff);
+      --hint: var(--tg-theme-hint-color, #b3b3b3);
       --link: var(--tg-theme-link-color, #1db954);
       --btn: var(--tg-theme-button-color, #1db954);
-      --btn-text: var(--tg-theme-button-text-color, #fff);
-      --secondary-bg: var(--tg-theme-secondary-bg-color, #16213e);
-      --section-bg: var(--tg-theme-section-bg-color, #0f3460);
+      --btn-text: var(--tg-theme-button-text-color, #000000);
+      --secondary-bg: var(--tg-theme-secondary-bg-color, #282828);
+      --section-bg: var(--tg-theme-section-bg-color, #181818);
     }
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      padding-bottom: 100px;
+      padding-bottom: 70px;
     }
-
-    .header {
-      text-align: center;
-      padding: 20px 16px 12px;
-    }
+    .hidden { display: none !important; }
+    
+    .header { text-align: center; padding: 20px 16px 12px; }
     .header h1 { font-size: 22px; font-weight: 700; }
     .header p { font-size: 13px; color: var(--hint); margin-top: 4px; }
+    
+    .page { animation: fadeIn 0.2s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    .search-box {
-      display: flex;
-      gap: 8px;
-      padding: 0 16px;
-      margin-bottom: 16px;
+    .tab-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--bg);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex; justify-content: space-around;
+      padding: 10px 0;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      z-index: 1000;
     }
+    .tab-btn {
+      background: none; border: none; color: var(--hint);
+      font-size: 11px; display: flex; flex-direction: column;
+      align-items: center; gap: 4px; cursor: pointer;
+    }
+    .tab-btn.active { color: var(--link); }
+    .tab-btn .icon { font-size: 20px; }
+
+    .search-box { display: flex; gap: 8px; padding: 0 16px; margin-bottom: 16px; }
     .search-box input {
-      flex: 1;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.1);
-      background: var(--secondary-bg);
-      color: var(--text);
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s;
+      flex: 1; padding: 12px 14px; border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1); background: var(--secondary-bg);
+      color: var(--text); font-size: 14px; outline: none;
     }
     .search-box input:focus { border-color: var(--link); }
-    .search-box input::placeholder { color: var(--hint); }
-
     .search-box button {
-      padding: 12px 18px;
-      border-radius: 12px;
-      border: none;
-      background: var(--btn);
-      color: var(--btn-text);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: opacity 0.2s;
-    }
-    .search-box button:active { opacity: 0.7; }
-    .search-box button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    .playlist-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 0 16px 12px;
-    }
-    .playlist-header img {
-      width: 64px; height: 64px;
-      border-radius: 8px;
-      object-fit: cover;
-    }
-    .playlist-header .info h2 { font-size: 17px; font-weight: 600; }
-    .playlist-header .info p { font-size: 12px; color: var(--hint); margin-top: 2px; }
-
-    .controls {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 16px;
-      margin-bottom: 4px;
-    }
-    .controls label {
-      font-size: 13px;
-      color: var(--hint);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-    }
-    .controls .selected-count {
-      font-size: 13px;
-      color: var(--link);
-      font-weight: 600;
+      padding: 12px 18px; border-radius: 12px; border: none;
+      background: var(--btn); color: var(--btn-text);
+      font-size: 14px; font-weight: 600; cursor: pointer;
     }
 
     .track-list { list-style: none; }
-
     .track-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      transition: background 0.15s;
-      cursor: pointer;
-      position: relative;
+      display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+      cursor: pointer; position: relative;
     }
-    .track-item:active { background: rgba(255,255,255,0.04); }
     .track-item.selected { background: rgba(29,185,84,0.08); }
-
-    .track-item .cover-wrap {
-      position: relative;
-      width: 48px; height: 48px;
-      flex-shrink: 0;
-    }
-    .track-item .cover-wrap img {
-      width: 48px; height: 48px;
-      border-radius: 6px;
-      object-fit: cover;
-    }
-    .track-item .cover-wrap .play-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 6px;
-      background: rgba(0,0,0,0.45);
-      opacity: 0;
-      transition: opacity 0.2s;
-      font-size: 18px;
+    .track-item .cover-wrap { position: relative; width: 48px; height: 48px; flex-shrink: 0; }
+    .track-item .cover-wrap img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; }
+    .play-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center;
+      justify-content: center; border-radius: 6px; background: rgba(0,0,0,0.45);
+      opacity: 0; transition: opacity 0.2s; font-size: 18px;
     }
     .track-item .cover-wrap:hover .play-overlay { opacity: 1; }
     .track-item .cover-wrap.playing .play-overlay { opacity: 1; background: rgba(29,185,84,0.6); }
-
     .track-info { flex: 1; min-width: 0; }
-    .track-info .title {
-      font-size: 14px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .track-info .artist {
-      font-size: 12px;
-      color: var(--hint);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .track-dur {
-      font-size: 12px;
-      color: var(--hint);
-      flex-shrink: 0;
-      margin-right: 4px;
-    }
+    .track-info .title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .track-info .artist { font-size: 12px; color: var(--hint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    .track-actions { display: flex; gap: 12px; align-items: center; }
+    .track-action-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--hint); }
+    .track-action-btn.active { color: var(--link); }
+    .track-action-btn.red { color: #e74c3c; }
 
     .track-check {
-      width: 22px; height: 22px;
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      transition: all 0.15s;
+      width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-    .track-item.selected .track-check {
-      border-color: var(--link);
-      background: var(--link);
+    .track-item.selected .track-check { border-color: var(--link); background: var(--link); }
+    .track-item.selected .track-check::after { content: '✓'; color: var(--bg); font-size: 13px; font-weight: 700; }
+
+    .genre-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 10px; padding: 16px;
     }
-    .track-item.selected .track-check::after {
-      content: '✓';
-      color: #fff;
-      font-size: 13px;
-      font-weight: 700;
+    .genre-card {
+      border-radius: 8px; padding: 16px; min-height: 80px;
+      font-weight: 700; color: #fff; display: flex;
+      align-items: flex-start; justify-content: space-between;
+      cursor: pointer; position: relative; overflow: hidden;
     }
+
+    .library-item {
+      display: flex; align-items: center; padding: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;
+    }
+    .library-item:active { background: rgba(255,255,255,0.05); }
+    .library-item .emoji { font-size: 24px; margin-right: 12px; }
+    .library-item .info { flex: 1; }
+    .library-item .info .name { font-size: 16px; font-weight: 600; }
+    .library-item .info .count { font-size: 12px; color: var(--hint); }
+    .library-item .chevron { color: var(--hint); font-weight: bold; }
+    
+    .fab {
+      position: fixed; bottom: 90px; right: 20px;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--btn); color: var(--btn-text);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      cursor: pointer; border: none; z-index: 100;
+    }
+
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2000; padding: 16px;
+    }
+    .modal-content {
+      background: var(--secondary-bg); border-radius: 12px;
+      padding: 20px; width: 100%; max-width: 320px;
+    }
+    .modal-content h3 { margin-bottom: 16px; font-size: 18px; }
+    .modal-content input {
+      width: 100%; padding: 12px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1); background: var(--bg);
+      color: var(--text); margin-bottom: 16px;
+    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+    .modal-btn {
+      padding: 10px 16px; border-radius: 8px; border: none;
+      font-weight: 600; cursor: pointer;
+    }
+    .btn-cancel { background: transparent; color: var(--hint); }
+    .btn-submit { background: var(--btn); color: var(--btn-text); }
+    
+    .playlist-choice-item {
+      padding: 12px; border-radius: 8px; background: var(--bg);
+      margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+      cursor: pointer;
+    }
+    .playlist-choice-item:active { background: rgba(255,255,255,0.1); }
 
     .download-bar {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      background: var(--secondary-bg);
-      border-top: 1px solid rgba(255,255,255,0.08);
-      padding: 12px 16px;
-      padding-bottom: max(12px, env(safe-area-inset-bottom));
-      z-index: 100;
+      position: fixed; bottom: 70px; left: 0; right: 0;
+      background: var(--secondary-bg); padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.08); z-index: 900;
     }
     .download-bar button {
-      width: 100%;
-      padding: 14px;
-      border-radius: 12px;
-      border: none;
-      background: var(--btn);
-      color: var(--btn-text);
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.2s;
+      width: 100%; padding: 14px; border-radius: 12px; border: none;
+      background: var(--btn); color: var(--btn-text);
+      font-size: 15px; font-weight: 700; cursor: pointer;
     }
-    .download-bar button:active { opacity: 0.7; }
-    .download-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .download-bar button:disabled { opacity: 0.5; }
 
-    .progress-section {
-      padding: 0 16px;
-    }
-    .progress-track-name {
-      font-size: 13px;
-      color: var(--hint);
-      margin-bottom: 8px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .progress-bar-container {
-      width: 100%;
-      height: 6px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 3px;
-      overflow: hidden;
-      margin-bottom: 6px;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: var(--link);
-      border-radius: 3px;
-      transition: width 0.3s;
-      width: 0%;
-    }
-    .progress-stats {
-      font-size: 12px;
-      color: var(--hint);
-      text-align: center;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 40px 16px;
-      color: var(--hint);
-      font-size: 14px;
-    }
+    .playlist-header { display: flex; align-items: center; gap: 14px; padding: 0 16px 12px; }
+    .playlist-header img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; }
+    .playlist-header .info h2 { font-size: 17px; font-weight: 600; }
+    .playlist-header .info p { font-size: 12px; color: var(--hint); margin-top: 2px; }
+    
+    .loading { text-align: center; padding: 40px 16px; color: var(--hint); font-size: 14px; }
     .spinner {
-      width: 32px; height: 32px;
-      border: 3px solid rgba(255,255,255,0.1);
-      border-top-color: var(--link);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 12px;
+      width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--link); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 12px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .empty-state {
-      text-align: center;
-      padding: 60px 32px;
-      color: var(--hint);
-    }
-    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
-    .empty-state p { font-size: 14px; line-height: 1.5; }
+    .controls { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; }
+    .controls label { font-size: 13px; color: var(--hint); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .controls .selected-count { font-size: 13px; color: var(--link); font-weight: 600; }
+    
+    .top-bar { display: flex; padding: 12px 16px; gap: 12px; align-items: center; }
+    .back-btn { background: none; border: none; color: var(--link); font-size: 16px; cursor: pointer; }
 
-    .hidden { display: none !important; }
+    .playlist-actions { padding: 16px; display: flex; gap: 12px; }
+    .playlist-actions button {
+      flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer;
+      background: var(--secondary-bg); color: var(--text);
+    }
+    .playlist-actions button.primary { background: var(--btn); color: var(--btn-text); }
+    .playlist-actions button.danger { color: #e74c3c; }
   </style>
 </head>
 <body>
 
-  <div class="header">
-    <h1>🎵 SpotifyToTelegram</h1>
-    <p>Вставьте ссылку Spotify или напишите название песни</p>
+  <!-- PAGE: Search -->
+  <div id="page-search" class="page">
+    <div class="header">
+      <h1>🎵 Поиск</h1>
+      <p>Вставьте ссылку Spotify или название песни</p>
+    </div>
+    <div class="search-box">
+      <input type="text" id="urlInput" placeholder="Ссылка или название..." autocomplete="off">
+      <button id="loadBtn" onclick="loadPlaylist()">Поиск</button>
+    </div>
+    
+    <div id="search-loading" class="loading hidden">
+      <div class="spinner"></div>
+      <p id="loadingText">Загрузка...</p>
+    </div>
+
+    <div id="playlistContent" class="hidden" style="padding-bottom: 80px;">
+      <div class="playlist-header">
+        <img id="playlistCover" src="" alt="" style="display:none;">
+        <div class="info">
+          <h2 id="playlistTitle">Результаты</h2>
+          <p id="playlistMeta"></p>
+        </div>
+      </div>
+      
+      <div class="controls">
+        <label><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"> Выбрать всё</label>
+        <span class="selected-count" id="selectedCount">Выбрано: 0</span>
+      </div>
+      <ul class="track-list" id="trackList"></ul>
+    </div>
+    
+    <div class="download-bar hidden" id="downloadBar">
+      <button id="downloadBtn" onclick="startDownload()">Отправить в чат (0)</button>
+    </div>
   </div>
 
-  <div class="search-box">
-    <input type="text" id="urlInput" placeholder="Ссылка или название (Miyagi Тамада)" autocomplete="off">
-    <button id="loadBtn" onclick="loadPlaylist()">Поиск</button>
+  <!-- PAGE: Explore -->
+  <div id="page-explore" class="page hidden">
+    <div class="header">
+      <h1>🧭 Жанры</h1>
+      <p>Исследуйте музыку по настроению</p>
+    </div>
+    <div id="genreGrid" class="genre-grid"></div>
   </div>
 
-  <!-- Empty state -->
-  <div id="emptyState" class="empty-state">
-    <div class="icon">🎧</div>
-    <p>Вставьте ссылку Spotify или название трека,<br>чтобы начать загрузку</p>
+  <!-- PAGE: Library -->
+  <div id="page-library" class="page hidden">
+    <div class="header">
+      <h1>📚 Медиатека</h1>
+      <p>Ваши плейлисты и сохранённые треки</p>
+    </div>
+    <div id="libraryList"></div>
+    <button class="fab" onclick="showCreatePlaylistModal()">＋</button>
   </div>
 
-  <!-- Loading -->
-  <div id="loadingState" class="loading hidden">
-    <div class="spinner"></div>
-    <p id="loadingText">Загрузка...</p>
-  </div>
-
-  <!-- Playlist content -->
-  <div id="playlistContent" class="hidden">
+  <!-- PAGE: Playlist Detail -->
+  <div id="page-playlist" class="page hidden">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goBack()">◀ Назад</button>
+    </div>
     <div class="playlist-header">
-      <img id="playlistCover" src="" alt="">
       <div class="info">
-        <h2 id="playlistTitle"></h2>
-        <p id="playlistMeta"></p>
+        <h2 id="detailPlaylistTitle">...</h2>
+        <p id="detailPlaylistMeta">...</p>
+      </div>
+    </div>
+    <div class="playlist-actions" id="detailPlaylistActions">
+      <!-- Action buttons injected here -->
+    </div>
+    <ul class="track-list" id="detailTrackList"></ul>
+  </div>
+
+  <!-- TabBar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-page="search" onclick="navigateTo('search')">
+      <span class="icon">🔍</span>
+      <span>Поиск</span>
+    </button>
+    <button class="tab-btn" data-page="explore" onclick="navigateTo('explore')">
+      <span class="icon">🧭</span>
+      <span>Жанры</span>
+    </button>
+    <button class="tab-btn" data-page="library" onclick="navigateTo('library')">
+      <span class="icon">📚</span>
+      <span>Моё</span>
+    </button>
+  </div>
+
+  <!-- Modals -->
+  <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal(event)">
+    <!-- Create Playlist -->
+    <div id="modal-create-playlist" class="modal-content hidden" onclick="event.stopPropagation()">
+      <h3>Создать плейлист</h3>
+      <input type="text" id="newPlaylistName" placeholder="Название плейлиста" autocomplete="off">
+      <input type="text" id="newPlaylistEmoji" placeholder="Эмодзи (например: 🎵)" value="🎵" autocomplete="off">
+      <div class="modal-actions">
+        <button class="modal-btn btn-cancel" onclick="closeModal()">Отмена</button>
+        <button class="modal-btn btn-submit" onclick="createPlaylist()">Создать</button>
       </div>
     </div>
 
-    <!-- Local Filter Box -->
-    <div class="filter-box" style="padding: 0 16px 12px;">
-      <input type="text" id="filterInput" placeholder="🔍 Фильтр по названию или автору..." autocomplete="off" oninput="filterTracks()" style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: var(--text); font-size: 14px; outline: none;">
+    <!-- Add to Playlist -->
+    <div id="modal-add-to-playlist" class="modal-content hidden" onclick="event.stopPropagation()">
+      <h3>Добавить в плейлист</h3>
+      <div id="playlistChoices" style="max-height: 300px; overflow-y: auto;">
+        <!-- Choices injected here -->
+      </div>
+      <div class="modal-actions" style="margin-top: 16px;">
+        <button class="modal-btn btn-cancel" onclick="closeModal()">Отмена</button>
+      </div>
     </div>
-
-    <div class="controls">
-      <label>
-        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
-        Выбрать видимые
-      </label>
-      <span class="selected-count" id="selectedCount">0 selected</span>
-    </div>
-
-    <!-- 100 track limit banner -->
-    <div id="limitBanner" class="hidden" style="margin: 6px 16px 10px; padding: 10px 12px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; font-size: 12px; color: #fbbf24; line-height: 1.4;">
-      ⚠️ <b>Лимит Spotify:</b> загружены первые 100 добавленных в плейлист треков. Если треков больше, разделите плейлист в Spotify на части по &lt;100 треков.
-    </div>
-
-    <ul class="track-list" id="trackList"></ul>
-  </div>
-
-  <!-- Download progress -->
-  <div id="progressSection" class="progress-section hidden">
-    <p class="progress-track-name" id="progressTrackName">Preparing...</p>
-    <div class="progress-bar-container">
-      <div class="progress-bar-fill" id="progressBarFill"></div>
-    </div>
-    <p class="progress-stats" id="progressStats"></p>
-  </div>
-
-  <!-- Bottom download button -->
-  <div class="download-bar hidden" id="downloadBar">
-    <button id="downloadBtn" onclick="startDownload()">Отправить в чат (0)</button>
   </div>
 
   <audio id="previewPlayer" preload="none"></audio>
@@ -346,36 +319,78 @@
     tg.ready();
     tg.expand();
 
+    let userId = tg.initDataUnsafe?.user?.id || 12345;
+    
+    const pages = ['search', 'explore', 'library', 'playlist'];
+    let currentPage = 'search';
+    let historyStack = [];
+    
     let tracks = [];
     let selectedIds = new Set();
     let currentPreviewId = null;
     const player = document.getElementById('previewPlayer');
+    
+    let genresLoaded = false;
+    let userPlaylists = [];
+    let trackToAdd = null;
+    let currentDetailPlaylistId = null;
+
+    function navigateTo(page, data = null) {
+      if (currentPage === 'playlist' && page !== 'playlist') {
+        historyStack = [];
+      } else if (page === 'playlist') {
+        historyStack.push(currentPage);
+      }
+      
+      pages.forEach(p => document.getElementById(`page-${p}`).classList.add('hidden'));
+      document.getElementById(`page-${page}`).classList.remove('hidden');
+      
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const activeTab = document.querySelector(`.tab-btn[data-page="${page === 'playlist' ? 'library' : page}"]`);
+      if (activeTab) activeTab.classList.add('active');
+      
+      currentPage = page;
+      
+      if (page === 'explore' && !genresLoaded) loadGenres();
+      if (page === 'library') loadLibrary();
+      
+      if (currentPreviewId) togglePreview(currentPreviewId, null);
+    }
+
+    function goBack() {
+      const prevPage = historyStack.pop() || 'library';
+      navigateTo(prevPage);
+    }
 
     function fmt(sec) {
       const m = Math.floor(sec / 60);
       const s = sec % 60;
       return `${m}:${s.toString().padStart(2, '0')}`;
     }
-
-    async function loadPlaylist() {
-      const inputVal = document.getElementById('urlInput').value.trim();
+    
+    function escapeHtml(text) {
+      if (!text) return '';
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+    
+    async function loadPlaylist(queryOverride = null) {
+      const inputVal = queryOverride !== null ? queryOverride : document.getElementById('urlInput').value.trim();
       if (!inputVal) return;
+      if (queryOverride) document.getElementById('urlInput').value = queryOverride;
 
       const isUrl = inputVal.includes('http') || inputVal.includes('spotify:');
       
-      document.getElementById('emptyState').classList.add('hidden');
       document.getElementById('playlistContent').classList.add('hidden');
       document.getElementById('downloadBar').classList.add('hidden');
-      document.getElementById('progressSection').classList.add('hidden');
-      document.getElementById('loadingState').classList.remove('hidden');
+      document.getElementById('search-loading').classList.remove('hidden');
       document.getElementById('loadingText').textContent = isUrl ? 'Загрузка плейлиста...' : 'Поиск треков...';
       document.getElementById('loadBtn').disabled = true;
-      document.getElementById('filterInput').value = ''; // Reset filter
 
       try {
-        const userId = tg.initDataUnsafe?.user?.id || '';
         const endpoint = isUrl 
-          ? `/api/playlist?url=${encodeURIComponent(inputVal)}&user_id=${encodeURIComponent(userId)}`
+          ? `/api/playlist?url=${encodeURIComponent(inputVal)}&user_id=${userId}`
           : `/api/search?q=${encodeURIComponent(inputVal)}`;
           
         const resp = await fetch(endpoint);
@@ -383,22 +398,15 @@
         const data = await resp.json();
 
         tracks = data.tracks;
-        
-        // If it was a text search, only select the top result by default instead of all.
-        if (isUrl) {
-            selectedIds = new Set(tracks.map(t => t.id));
-        } else {
-            selectedIds = new Set(tracks.length > 0 ? [tracks[0].id] : []);
-        }
+        selectedIds = new Set(isUrl ? tracks.map(t => t.id) : (tracks.length > 0 ? [tracks[0].id] : []));
 
-        // Fill playlist header
         const coverImg = document.getElementById('playlistCover');
         if (data.cover_url) {
             coverImg.src = data.cover_url;
             coverImg.style.display = 'block';
-        } else if (data.type === 'search' && tracks.length > 0) {
-            coverImg.src = tracks[0].cover_url || '';
-            coverImg.style.display = tracks[0].cover_url ? 'block' : 'none';
+        } else if (data.type === 'search' && tracks.length > 0 && tracks[0].cover_url) {
+            coverImg.src = tracks[0].cover_url;
+            coverImg.style.display = 'block';
         } else {
             coverImg.style.display = 'none';
         }
@@ -406,18 +414,9 @@
         document.getElementById('playlistTitle').textContent = data.title;
         document.getElementById('playlistMeta').textContent = `${data.total} треков найдено`;
 
-        // 100-track limit banner
-        const banner = document.getElementById('limitBanner');
-        if (data.total >= 100 && data.type === 'playlist') {
-          banner.classList.remove('hidden');
-        } else {
-          banner.classList.add('hidden');
-        }
+        await renderTracks('trackList', tracks, true);
 
-        // Render tracks
-        renderTracks();
-
-        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('search-loading').classList.add('hidden');
         document.getElementById('playlistContent').classList.remove('hidden');
         document.getElementById('downloadBar').classList.remove('hidden');
         
@@ -425,18 +424,17 @@
         updateSelectedCount();
       } catch (e) {
         alert('Ошибка. Проверьте ссылку или запрос и попробуйте снова.');
-        document.getElementById('loadingState').classList.add('hidden');
-        document.getElementById('emptyState').classList.remove('hidden');
+        document.getElementById('search-loading').classList.add('hidden');
       } finally {
         document.getElementById('loadBtn').disabled = false;
       }
     }
 
-    function renderTracks() {
-      const list = document.getElementById('trackList');
+    async function renderTracks(containerId, trackList, isSearch = false, playlistId = null) {
+      const list = document.getElementById(containerId);
       list.innerHTML = '';
 
-      tracks.forEach((track, idx) => {
+      for (const track of trackList) {
         const li = document.createElement('li');
         li.className = 'track-item' + (selectedIds.has(track.id) ? ' selected' : '');
         li.dataset.id = track.id;
@@ -444,6 +442,24 @@
         const coverSmall = track.cover_url
           ? track.cover_url.replace('/640/', '/64/').replace('ab67616d0000b273', 'ab67616d00004851')
           : '';
+
+        let actionHtml = '';
+        if (isSearch) {
+          actionHtml = `
+            <div class="track-actions" onclick="event.stopPropagation()">
+              <button class="track-action-btn" onclick="toggleFavorite(this, '${escapeHtml(JSON.stringify(track))}')">🤍</button>
+              <button class="track-action-btn" onclick="showAddToPlaylistModal('${escapeHtml(JSON.stringify(track))}')">＋</button>
+            </div>
+          `;
+        } else if (playlistId) {
+          actionHtml = `
+            <div class="track-actions" onclick="event.stopPropagation()">
+              <button class="track-action-btn red" onclick="removeTrackFromPlaylist(${playlistId}, ${track.db_id || track.id})">✕</button>
+            </div>
+          `;
+        }
+
+        let selectionHtml = isSearch ? `<div class="track-check"></div>` : '';
 
         li.innerHTML = `
           <div class="cover-wrap" onclick="event.stopPropagation(); togglePreview('${track.id}', '${track.preview_url || ''}')">
@@ -455,47 +471,23 @@
             <div class="artist">${escapeHtml(track.artist)}</div>
           </div>
           <span class="track-dur">${fmt(track.duration_sec)}</span>
-          <div class="track-check"></div>
+          ${actionHtml}
+          ${selectionHtml}
         `;
 
-        li.addEventListener('click', () => toggleTrack(track.id));
+        if (isSearch) {
+          li.addEventListener('click', () => toggleTrack(track.id));
+        }
         list.appendChild(li);
-      });
-    }
-
-    function filterTracks() {
-      const query = document.getElementById('filterInput').value.toLowerCase();
-      const items = document.querySelectorAll('.track-item');
-      
-      items.forEach(item => {
-        const id = item.dataset.id;
-        const track = tracks.find(t => t.id === id);
-        if (!track) return;
-        
-        const isMatch = track.title.toLowerCase().includes(query) || track.artist.toLowerCase().includes(query);
-        item.style.display = isMatch ? 'flex' : 'none';
-      });
-      
-      updateSelectAllCheckbox();
-    }
-
-    function escapeHtml(text) {
-      const d = document.createElement('div');
-      d.textContent = text;
-      return d.innerHTML;
+      }
     }
 
     function toggleTrack(id) {
-      if (selectedIds.has(id)) {
-        selectedIds.delete(id);
-      } else {
-        selectedIds.add(id);
-      }
-      // Update visual
-      document.querySelectorAll('.track-item').forEach(el => {
-        if (el.dataset.id === id) {
-           el.classList.toggle('selected', selectedIds.has(id));
-        }
+      if (selectedIds.has(id)) selectedIds.delete(id);
+      else selectedIds.add(id);
+      
+      document.querySelectorAll('#trackList .track-item').forEach(el => {
+        if (el.dataset.id === id) el.classList.toggle('selected', selectedIds.has(id));
       });
       updateSelectAllCheckbox();
       updateSelectedCount();
@@ -503,34 +495,20 @@
 
     function toggleSelectAll() {
       const checked = document.getElementById('selectAll').checked;
-      const items = document.querySelectorAll('.track-item');
-      
-      items.forEach(item => {
-        if (item.style.display !== 'none') {
-          const id = item.dataset.id;
-          if (checked) {
-            selectedIds.add(id);
-            item.classList.add('selected');
-          } else {
-            selectedIds.delete(id);
-            item.classList.remove('selected');
-          }
-        }
+      document.querySelectorAll('#trackList .track-item').forEach(item => {
+        const id = item.dataset.id;
+        if (checked) { selectedIds.add(id); item.classList.add('selected'); }
+        else { selectedIds.delete(id); item.classList.remove('selected'); }
       });
-      
       updateSelectedCount();
     }
     
     function updateSelectAllCheckbox() {
-      const visibleItems = Array.from(document.querySelectorAll('.track-item')).filter(i => i.style.display !== 'none');
-      if (visibleItems.length === 0) {
-        document.getElementById('selectAll').checked = false;
-        return;
-      }
-      const allSelected = visibleItems.every(i => selectedIds.has(i.dataset.id));
-      document.getElementById('selectAll').checked = allSelected;
+      const items = Array.from(document.querySelectorAll('#trackList .track-item'));
+      if (items.length === 0) return;
+      document.getElementById('selectAll').checked = items.every(i => selectedIds.has(i.dataset.id));
     }
-
+    
     function updateSelectedCount() {
       const n = selectedIds.size;
       document.getElementById('selectedCount').textContent = `Выбрано: ${n}`;
@@ -541,23 +519,18 @@
 
     function togglePreview(id, previewUrl) {
       if (!previewUrl) return;
-
-      // Toggle off if same track
       if (currentPreviewId === id) {
         player.pause();
         currentPreviewId = null;
         document.querySelectorAll('.cover-wrap').forEach(el => el.classList.remove('playing'));
         return;
       }
-
       currentPreviewId = id;
       player.src = previewUrl;
       player.play();
-
       document.querySelectorAll('.cover-wrap').forEach(el => el.classList.remove('playing'));
       const item = document.querySelector(`.track-item[data-id="${id}"] .cover-wrap`);
       if (item) item.classList.add('playing');
-
       player.onended = () => {
         currentPreviewId = null;
         document.querySelectorAll('.cover-wrap').forEach(el => el.classList.remove('playing'));
@@ -566,79 +539,250 @@
 
     async function startDownload() {
       if (selectedIds.size === 0) return;
-
       const selectedTracks = tracks.filter(t => selectedIds.has(t.id));
-      const chatId = tg.initDataUnsafe?.user?.id;
-
-      if (!chatId) {
-        alert('Не удалось определить ID чата. Откройте приложение через Telegram.');
-        return;
-      }
-
-      // Disable button, show progress
+      
       document.getElementById('downloadBtn').disabled = true;
-      document.getElementById('downloadBtn').textContent = 'Загрузка...';
-      document.getElementById('progressSection').classList.remove('hidden');
-
+      document.getElementById('downloadBtn').textContent = 'Отправка...';
+      
       try {
         const resp = await fetch('/api/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            tracks: selectedTracks,
-          }),
+          body: JSON.stringify({ chat_id: userId, tracks: selectedTracks }),
         });
-
-        if (!resp.ok) throw new Error('Download request failed');
-        const { job_id } = await resp.json();
-
-        // Listen to SSE for progress
-        const evtSource = new EventSource(`/api/status/${job_id}`);
-        evtSource.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          const pct = data.total > 0 ? Math.round((data.current / data.total) * 100) : 0;
-
-          document.getElementById('progressBarFill').style.width = `${pct}%`;
-          document.getElementById('progressTrackName').textContent =
-            data.current_track ? `Отправка: ${data.current_track}` : 'Подготовка...';
-          document.getElementById('progressStats').textContent =
-            `${data.current} / ${data.total} (отправлено ${data.success})`;
-
-          if (data.status === 'completed' || data.status === 'cancelled') {
-            evtSource.close();
-            document.getElementById('progressBarFill').style.width = '100%';
-            document.getElementById('progressTrackName').textContent =
-              `Готово! Отправлено ${data.success} из ${data.total} треков.`;
-            document.getElementById('downloadBtn').textContent = 'Отправить в чат (' + selectedIds.size + ')';
-            document.getElementById('downloadBtn').disabled = false;
-
-            // Haptic feedback
-            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-          }
-        };
-
-        evtSource.onerror = () => {
-          evtSource.close();
-          document.getElementById('downloadBtn').textContent = 'Отправить в чат (' + selectedIds.size + ')';
-          document.getElementById('downloadBtn').disabled = false;
-        };
+        if (!resp.ok) throw new Error();
+        tg.showPopup({ message: 'Загрузка запущена. Проверьте чат с ботом!' });
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       } catch (e) {
-        alert('Ошибка при запуске скачивания: ' + e.message);
-        document.getElementById('downloadBtn').textContent = 'Отправить в чат (' + selectedIds.size + ')';
-        document.getElementById('downloadBtn').disabled = false;
+        alert('Ошибка при запуске скачивания.');
+      } finally {
+        updateSelectedCount();
       }
     }
 
-    // Handle paste from clipboard on mobile
-    document.getElementById('urlInput').addEventListener('paste', () => {
-      setTimeout(() => {
-        const val = document.getElementById('urlInput').value;
-        if (val.includes('open.spotify.com') || val.includes('spotify:')) {
-          loadPlaylist();
+    async function loadGenres() {
+      try {
+        const resp = await fetch('/api/explore/genres');
+        const genres = await resp.json();
+        const grid = document.getElementById('genreGrid');
+        grid.innerHTML = genres.map(g => `
+          <div class="genre-card" style="background: ${g.color}" onclick="openGenre('${g.slug}', '${g.name}')">
+            <span>${g.name}</span>
+          </div>
+        `).join('');
+        genresLoaded = true;
+      } catch (e) { console.error(e); }
+    }
+
+    async function openGenre(slug, name) {
+      navigateTo('search');
+      document.getElementById('urlInput').value = '';
+      document.getElementById('playlistContent').classList.add('hidden');
+      document.getElementById('downloadBar').classList.add('hidden');
+      document.getElementById('search-loading').classList.remove('hidden');
+      document.getElementById('loadingText').textContent = `Загрузка: ${name}...`;
+      
+      try {
+        const resp = await fetch(`/api/explore/genre/${slug}`);
+        const data = await resp.json();
+        tracks = data.tracks || [];
+        selectedIds = new Set();
+        
+        document.getElementById('playlistTitle').textContent = `Жанр: ${name}`;
+        document.getElementById('playlistMeta').textContent = `${tracks.length} треков`;
+        document.getElementById('playlistCover').style.display = 'none';
+        
+        await renderTracks('trackList', tracks, true);
+        
+        document.getElementById('search-loading').classList.add('hidden');
+        document.getElementById('playlistContent').classList.remove('hidden');
+        document.getElementById('downloadBar').classList.remove('hidden');
+        updateSelectAllCheckbox(); updateSelectedCount();
+      } catch (e) {
+        alert('Ошибка загрузки жанра.');
+        document.getElementById('search-loading').classList.add('hidden');
+      }
+    }
+
+    async function loadLibrary() {
+      try {
+        const resp = await fetch(`/api/library?user_id=${userId}`);
+        userPlaylists = await resp.json();
+        const list = document.getElementById('libraryList');
+        list.innerHTML = userPlaylists.map(p => `
+          <div class="library-item" onclick="showPlaylistDetail(${p.id})">
+            <div class="emoji">${p.emoji || '🎵'}</div>
+            <div class="info">
+              <div class="name">${escapeHtml(p.name)}</div>
+              <div class="count">${p.track_count} треков</div>
+            </div>
+            <div class="chevron">></div>
+          </div>
+        `).join('');
+      } catch (e) { console.error(e); }
+    }
+
+    async function showPlaylistDetail(id) {
+      currentDetailPlaylistId = id;
+      navigateTo('playlist');
+      
+      const p = userPlaylists.find(x => x.id === id);
+      if (p) {
+        document.getElementById('detailPlaylistTitle').textContent = `${p.emoji || '🎵'} ${p.name}`;
+        document.getElementById('detailPlaylistMeta').textContent = `${p.track_count} треков`;
+      }
+
+      document.getElementById('detailTrackList').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      
+      let actionsHtml = `<button class="primary" onclick="sendPlaylistToChat(${id})">📥 Отправить всё в чат</button>`;
+      if (!p?.is_favorites) {
+        actionsHtml += `<button onclick="deletePlaylist(${id})" class="danger">🗑 Удалить</button>`;
+      }
+      document.getElementById('detailPlaylistActions').innerHTML = actionsHtml;
+
+      try {
+        const resp = await fetch(`/api/library/playlist/${id}/tracks?user_id=${userId}`);
+        const playlistTracks = await resp.json();
+        await renderTracks('detailTrackList', playlistTracks, false, id);
+      } catch (e) {
+        document.getElementById('detailTrackList').innerHTML = '<div class="loading">Ошибка загрузки треков</div>';
+      }
+    }
+
+    async function sendPlaylistToChat(playlistId) {
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+      tg.showPopup({ message: 'Запуск доставки плейлиста...' });
+      
+      try {
+        await fetch('/api/library/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, playlist_id: playlistId })
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    async function removeTrackFromPlaylist(playlistId, trackInfoId) {
+      try {
+        await fetch(`/api/library/track?user_id=${userId}&playlist_id=${playlistId}&track_info_id=${trackInfoId}`, {
+          method: 'DELETE'
+        });
+        showPlaylistDetail(playlistId);
+      } catch (e) { console.error(e); }
+    }
+
+    async function deletePlaylist(id) {
+      if (confirm("Точно удалить плейлист?")) {
+        try {
+          await fetch(`/api/library/playlist/${id}?user_id=${userId}`, { method: 'DELETE' });
+          goBack();
+          loadLibrary();
+        } catch (e) { console.error(e); }
+      }
+    }
+
+    function showCreatePlaylistModal() {
+      document.getElementById('modal-overlay').classList.remove('hidden');
+      document.getElementById('modal-create-playlist').classList.remove('hidden');
+      document.getElementById('modal-add-to-playlist').classList.add('hidden');
+    }
+
+    function showAddToPlaylistModal(trackStr) {
+      trackToAdd = JSON.parse(trackStr);
+      
+      if (userPlaylists.length === 0) {
+        fetch(`/api/library?user_id=${userId}`).then(r => r.json()).then(data => {
+          userPlaylists = data;
+          renderPlaylistChoices();
+        });
+      } else {
+        renderPlaylistChoices();
+      }
+
+      document.getElementById('modal-overlay').classList.remove('hidden');
+      document.getElementById('modal-add-to-playlist').classList.remove('hidden');
+      document.getElementById('modal-create-playlist').classList.add('hidden');
+    }
+
+    function renderPlaylistChoices() {
+      const container = document.getElementById('playlistChoices');
+      container.innerHTML = userPlaylists.map(p => `
+        <div class="playlist-choice-item" onclick="addTrackToPlaylist(${p.id})">
+          <span style="font-size: 20px;">${p.emoji || '🎵'}</span>
+          <span>${escapeHtml(p.name)}</span>
+        </div>
+      `).join('');
+    }
+
+    function closeModal(e) {
+      if (e && e.target !== document.getElementById('modal-overlay')) return;
+      document.getElementById('modal-overlay').classList.add('hidden');
+    }
+
+    async function createPlaylist() {
+      const name = document.getElementById('newPlaylistName').value.trim();
+      const emoji = document.getElementById('newPlaylistEmoji').value.trim() || '🎵';
+      if (!name) return;
+      
+      try {
+        await fetch('/api/library/playlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, name, emoji })
+        });
+        closeModal();
+        document.getElementById('newPlaylistName').value = '';
+        if (currentPage === 'library') loadLibrary();
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      } catch (e) { console.error(e); }
+    }
+
+    async function addTrackToPlaylist(playlistId) {
+      if (!trackToAdd) return;
+      try {
+        await fetch('/api/library/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, playlist_id: playlistId, track: trackToAdd })
+        });
+        closeModal();
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        tg.showAlert("Трек добавлен в плейлист!");
+      } catch (e) { console.error(e); }
+    }
+
+    async function toggleFavorite(btnElement, trackStr) {
+      const track = JSON.parse(trackStr);
+      try {
+        if (userPlaylists.length === 0) {
+          const resp = await fetch(`/api/library?user_id=${userId}`);
+          userPlaylists = await resp.json();
         }
-      }, 100);
-    });
+        const fav = userPlaylists.find(p => p.is_favorites);
+        if (!fav) return;
+
+        await fetch('/api/library/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, playlist_id: fav.id, track: track })
+        });
+
+        btnElement.textContent = '❤️';
+        btnElement.classList.add('red');
+        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      } catch (e) { console.error(e); }
+    }
+
+    if (currentPage === 'search') {
+      document.getElementById('urlInput').addEventListener('paste', () => {
+        setTimeout(() => {
+          const val = document.getElementById('urlInput').value;
+          if (val.includes('open.spotify.com') || val.includes('spotify:')) {
+            loadPlaylist();
+          }
+        }, 100);
+      });
+    }
   </script>
 </body>
 </html>

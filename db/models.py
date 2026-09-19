@@ -70,7 +70,47 @@ class DownloadLog(Base):
 
 class ArtistGenre(Base):
     __tablename__ = "artist_genres"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     artist_name = Column(String(256), unique=True, index=True, nullable=False)
     genres = Column(String(512), nullable=True)
     fetched_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class TrackInfo(Base):
+    """Универсальное хранилище метаданных треков (Spotify, iTunes, ручной ввод)."""
+    __tablename__ = "track_info"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_id = Column(String(128), unique=True, index=True, nullable=False)
+    title = Column(String(256), nullable=False)
+    artist = Column(String(256), nullable=False)
+    album = Column(String(256), nullable=True)
+    duration_sec = Column(Integer, nullable=True)
+    cover_url = Column(String(512), nullable=True)
+    preview_url = Column(String(512), nullable=True)
+    genre = Column(String(128), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserPlaylist(Base):
+    """Пользовательский плейлист (папка). Один специальный: is_favorites=True."""
+    __tablename__ = "user_playlists"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    name = Column(String(128), nullable=False)
+    emoji = Column(String(8), nullable=True)
+    is_favorites = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserPlaylistTrack(Base):
+    """Связующая таблица: какой трек лежит в каком плейлисте."""
+    __tablename__ = "user_playlist_tracks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    playlist_id = Column(Integer, ForeignKey("user_playlists.id", ondelete="CASCADE"), index=True, nullable=False)
+    track_info_id = Column(Integer, ForeignKey("track_info.id", ondelete="CASCADE"), index=True, nullable=False)
+    position = Column(Integer, default=0)
+    added_at = Column(DateTime, default=datetime.utcnow)

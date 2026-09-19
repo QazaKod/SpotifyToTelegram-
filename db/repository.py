@@ -2,12 +2,201 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import List, Optional
 from sqlalchemy import select, func, distinct
+from sqlalchemy.orm import selectinload
 
 from db.database import async_session
-from db.models import Chat, SentTrack, SyncPlaylist, User, DownloadLog, ArtistGenre
+from db.models import Chat, SentTrack, SyncPlaylist, User, DownloadLog, ArtistGenre, TrackInfo, UserPlaylist, UserPlaylistTrack
 
 
 class Repository:
+    # --- TrackInfo Management ---
+
+    @staticmethod
+    async def get_or_create_track_info(
+        source_id: str, title: str, artist: str,
+        album: str = "", duration_sec: int = 0,
+        cover_url: str = "", preview_url: str = "", genre: str = ""
+    ) -> TrackInfo:
+        async with async_session() as session:
+            stmt = select(TrackInfo).where(TrackInfo.source_id == source_id)
+            result = await session.execute(stmt)
+            track = result.scalars().first()
+            if not track:
+                track = TrackInfo(
+                    source_id=source_id, title=title, artist=artist,
+                    album=album, duration_sec=duration_sec,
+                    cover_url=cover_url, preview_url=preview_url, genre=genre
+                )
+                session.add(track)
+                await session.commit()
+                await session.refresh(track)
+            return track
+
+    # --- UserPlaylist Management ---
+
+    @staticmethod
+    async def get_or_create_favorites(user_db_id: int) -> UserPlaylist:
+        async with async_session() as session:
+            stmt = select(UserPlaylist).where(UserPlaylist.user_id == user_db_id, UserPlaylist.is_favorites == True)
+            result = await session.execute(stmt)
+            playlist = result.scalars().first()
+            if not playlist:
+                playlist = UserPlaylist(user_id=user_db_id, name="Любимые треки", emoji="❤️", is_favorites=True)
+                session.add(playlist)
+                await session.commit()
+                await session.refresh(playlist)
+            return playlist
+
+    @staticmethod
+    async def create_playlist(user_db_id: int, name: str, emoji: str = "🎵") -> UserPlaylist:
+        async with async_session() as session:
+            playlist = UserPlaylist(user_id=user_db_id, name=name, emoji=emoji, is_favorites=False)
+            session.add(playlist)
+            await session.commit()
+            await session.refresh(playlist)
+            return playlist
+
+    @staticmethod
+    async def get_user_playlists(user_db_id: int) -> list[dict]:
+        async with async_session() as session:
+            stmt = select(UserPlaylist).where(UserPlaylist.user_id == user_db_id).order_by(UserPlaylist.is_favorites.desc(), UserPlaylist.created_at.desc())
+            result = await session.execute(stmt)
+            playlists = result.scalars().all()
+            
+            out = []
+            for p in playlists:
+                # Get track count
+                count_stmt = select(func.count(UserPlaylistTrack.id)).where(UserPlaylistTrack.playlist_id == p.id)
+                count_res = await session.execute(count_stmt)
+                track_count = count_res.scalar() or 0
+                
+                # Get cover url from first track if any
+                cover_url = ""
+                if track_count > 0:
+                    cover_stmt = select(TrackInfo.cover_url).join(UserPlaylistTrack).where(
+                        UserPlaylistTrack.playlist_id == p.id
+                    ).order_by(UserPlaylistTrack.position.asc()).limit(1)
+                    cover_res = await session.execute(cover_stmt)
+                    cover_url = cover_res.scalar() or ""
+                
+                out.append({
+                    "id": p.id,
+                    "name": p.name,
+                    "emoji": p.emoji,
+                    "is_favorites": p.is_favorites,
+                    "track_count": track_count,
+                    "cover_url": cover_url
+                })
+            return out
+
+    @staticmethod
+    async def delete_playlist(playlist_id: int, user_db_id: int) -> bool:
+        async with async_session() as session:
+            stmt = select(UserPlaylist).where(UserPlaylist.id == playlist_id, UserPlaylist.user_id == user_db_id)
+            result = await session.execute(stmt)
+            playlist = result.scalars().first()
+            if playlist and not playlist.is_favorites:
+                await session.delete(playlist)
+                await session.commit()
+                return True
+            return False
+
+    @staticmethod
+    async def rename_playlist(playlist_id: int, user_db_id: int, new_name: str, new_emoji: str = None) -> bool:
+        async with async_session() as session:
+            stmt = select(UserPlaylist).where(UserPlaylist.id == playlist_id, UserPlaylist.user_id == user_db_id)
+            result = await session.execute(stmt)
+            playlist = result.scalars().first()
+            if playlist and not playlist.is_favorites:
+                playlist.name = new_name
+                if new_emoji:
+                    playlist.emoji = new_emoji
+                await session.commit()
+                return True
+            return False
+
+    # --- Playlist Tracks Management ---
+
+    @staticmethod
+    async def add_track_to_playlist(playlist_id: int, track_info_id: int) -> bool:
+        async with async_session() as session:
+            # Check duplicate
+            stmt = select(UserPlaylistTrack).where(
+                UserPlaylistTrack.playlist_id == playlist_id,
+                UserPlaylistTrack.track_info_id == track_info_id
+            )
+            res = await session.execute(stmt)
+            if res.scalars().first():
+                return False
+                
+            # Get max position
+            pos_stmt = select(func.max(UserPlaylistTrack.position)).where(UserPlaylistTrack.playlist_id == playlist_id)
+            pos_res = await session.execute(pos_stmt)
+            max_pos = pos_res.scalar() or 0
+            
+            link = UserPlaylistTrack(playlist_id=playlist_id, track_info_id=track_info_id, position=max_pos + 1)
+            session.add(link)
+            await session.commit()
+            return True
+
+    @staticmethod
+    async def remove_track_from_playlist(playlist_id: int, track_info_id: int) -> bool:
+        async with async_session() as session:
+            stmt = select(UserPlaylistTrack).where(
+                UserPlaylistTrack.playlist_id == playlist_id,
+                UserPlaylistTrack.track_info_id == track_info_id
+            )
+            res = await session.execute(stmt)
+            link = res.scalars().first()
+            if link:
+                await session.delete(link)
+                await session.commit()
+                return True
+            return False
+
+    @staticmethod
+    async def get_playlist_tracks(playlist_id: int, user_db_id: int) -> list[dict]:
+        # Verifying ownership
+        async with async_session() as session:
+            owner_stmt = select(UserPlaylist).where(UserPlaylist.id == playlist_id, UserPlaylist.user_id == user_db_id)
+            owner_res = await session.execute(owner_stmt)
+            if not owner_res.scalars().first():
+                return []
+                
+            stmt = select(TrackInfo, UserPlaylistTrack.added_at).join(
+                UserPlaylistTrack, TrackInfo.id == UserPlaylistTrack.track_info_id
+            ).where(
+                UserPlaylistTrack.playlist_id == playlist_id
+            ).order_by(UserPlaylistTrack.position.asc())
+            
+            result = await session.execute(stmt)
+            out = []
+            for track, added_at in result.all():
+                out.append({
+                    "db_id": track.id,
+                    "id": track.source_id,
+                    "title": track.title,
+                    "artist": track.artist,
+                    "album": track.album,
+                    "duration_sec": track.duration_sec,
+                    "cover_url": track.cover_url,
+                    "preview_url": track.preview_url,
+                    "genre": track.genre,
+                    "added_at": added_at.isoformat() if added_at else None
+                })
+            return out
+
+    @staticmethod
+    async def is_track_in_favorites(user_db_id: int, source_id: str) -> bool:
+        async with async_session() as session:
+            stmt = select(UserPlaylistTrack).join(UserPlaylist).join(TrackInfo, UserPlaylistTrack.track_info_id == TrackInfo.id).where(
+                UserPlaylist.user_id == user_db_id,
+                UserPlaylist.is_favorites == True,
+                TrackInfo.source_id == source_id
+            )
+            res = await session.execute(stmt)
+            return res.scalars().first() is not None
+
     @staticmethod
     async def get_or_create_chat(telegram_chat_id: int, is_channel: bool = False) -> Chat:
         async with async_session() as session:

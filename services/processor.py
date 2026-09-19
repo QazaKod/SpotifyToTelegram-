@@ -145,3 +145,64 @@ async def process_and_send_track(
                 os.remove(cover_path)
             except OSError:
                 pass
+
+async def download_and_tag_track(track: SpotifyTrack, user_id: int = None) -> Optional[dict]:
+    """
+    Скачивает и тегирует трек, НО НЕ отправляет.
+    """
+    user_db_id = None
+    if user_id:
+        try:
+            user = await Repository.get_or_create_user(telegram_user_id=user_id)
+            user_db_id = user.id
+        except Exception as e:
+            logger.warning(f"Ошибка при регистрации пользователя: {e}")
+
+    if track.title == "LazyTrack" and track.artist_str == "LazyArtist" and track.id.startswith("http"):
+        from services.spotify import fetch_spotify_data
+        real_collection = await fetch_spotify_data(track.id)
+        if real_collection and real_collection.tracks:
+            track = real_collection.tracks[0]
+        else:
+            logger.error(f"Не удалось получить данные о треке по ссылке: {track.id}")
+            return None
+
+    try:
+        async with download_semaphore:
+            logger.info(f"Начало загрузки (batch): {track.artist_str} - {track.title}")
+            result = await download_track(track)
+            if not result:
+                logger.error(f"Не удалось скачать трек: {track.artist_str} - {track.title}")
+                try:
+                    await Repository.log_download(user_db_id, track.id, track.title, track.artist_str, track.duration_sec, "unknown", False)
+                except:
+                    pass
+                return None
+            mp3_path, source = result
+            cover_path = await tag_mp3(mp3_path, track)
+            
+            try:
+                await Repository.log_download(user_db_id, track.id, track.title, track.artist_str, track.duration_sec, source, True)
+            except:
+                pass
+                
+            try:
+                from services.lastfm import fetch_artist_genre
+                import asyncio
+                asyncio.create_task(fetch_artist_genre(track.artist_str.split(',')[0].strip()))
+            except:
+                pass
+                
+            return {
+                'mp3_path': mp3_path,
+                'cover_path': cover_path,
+                'track': track,
+                'source': source
+            }
+    except Exception as e:
+        logger.exception(f"Ошибка при batch скачивании трека: {e}")
+        try:
+            await Repository.log_download(user_db_id, track.id, track.title, track.artist_str, track.duration_sec, "unknown", False)
+        except:
+            pass
+        return None

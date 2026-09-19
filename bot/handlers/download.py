@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from bot.keyboards.download import get_personalized_mix_keyboard, get_running_keyboard
 from db.repository import Repository
 from services.job_manager import JobManager
+from services.delivery import DeliveryManager
 from services.processor import process_and_send_track
 from services.spotify import fetch_spotify_data, is_personalized_mix, parse_spotify_url
 
@@ -200,12 +201,16 @@ async def process_multiple_spotify_urls(message: types.Message, bot: Bot, urls: 
         reply_markup=get_running_keyboard(),
     )
 
+    header_msg_id = await DeliveryManager.send_header(bot, message.chat.id, collection)
+
     await JobManager.start_job(
         chat_id=message.chat.id,
         collection=collection,
         status_msg_id=status_msg.message_id,
         bot=bot,
         user_id=user_id,
+        header_msg_id=header_msg_id,
+        use_media_groups=True
     )
 
 
@@ -278,9 +283,11 @@ async def process_spotify_url(message: types.Message, bot: Bot, url: str, force:
 
     # Плейлисты и альбомы -> передаем в JobManager с интерактивными кнопками!
     await status_msg.edit_text(
-        f"📑 **«{collection.title}»** (всего {total} треков){limit_note}\n\n⏳ Начинаем выгрузку...",
+        f"📑 **«{collection.title}»** (всего {total} треков){limit_note}\n\n⏳ Начинаем выгрузку (с MediaGroup)...",
         reply_markup=get_running_keyboard(),
     )
+
+    header_msg_id = await DeliveryManager.send_header(bot, message.chat.id, collection)
 
     await JobManager.start_job(
         chat_id=message.chat.id,
@@ -288,4 +295,6 @@ async def process_spotify_url(message: types.Message, bot: Bot, url: str, force:
         status_msg_id=status_msg.message_id,
         bot=bot,
         user_id=user_id,
+        header_msg_id=header_msg_id,
+        use_media_groups=True
     )

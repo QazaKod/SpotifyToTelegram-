@@ -325,7 +325,272 @@ async def handle_admin_api_recent_users(request: web.Request) -> web.Response:
     if not verify_admin(request): return web.json_response({"error": "unauthorized"}, status=401)
     return web.json_response(await Repository.get_recent_users())
 
+
+# ==========================================
+# LIBRARY & EXPLORE ENDPOINTS (Component 2)
+# ==========================================
+from services.delivery import DeliveryManager
+from services.job_manager import JobManager
+from services.spotify import SpotifyCollection, SpotifyTrack
+
+async def _get_user_db_id(user_id: str) -> Optional[int]:
+    if not user_id:
+        return None
+    try:
+        user = await Repository.get_or_create_user(telegram_user_id=int(user_id))
+        return user.id
+    except Exception as e:
+        logger.error(f"Error getting user_db_id: {e}")
+        return None
+
+async def handle_library(request: web.Request) -> web.Response:
+    user_id = request.query.get("user_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+    
+    playlists = await Repository.get_user_playlists(user_db_id)
+    return web.json_response(playlists)
+
+async def handle_create_playlist(request: web.Request) -> web.Response:
+    user_id = request.query.get("user_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+    
+    data = await request.json()
+    name = data.get("name")
+    emoji = data.get("emoji", "🎵")
+    if not name:
+        return web.json_response({"error": "Missing name"}, status=400)
+    
+    playlist = await Repository.create_playlist(user_db_id, name, emoji)
+    return web.json_response({"id": playlist.id, "name": playlist.name, "emoji": playlist.emoji})
+
+async def handle_delete_playlist(request: web.Request) -> web.Response:
+    user_id = request.query.get("user_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+        
+    playlist_id = int(request.match_info["id"])
+    success = await Repository.delete_playlist(playlist_id, user_db_id)
+    return web.json_response({"success": success})
+
+async def handle_rename_playlist(request: web.Request) -> web.Response:
+    user_id = request.query.get("user_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+        
+    playlist_id = int(request.match_info["id"])
+    data = await request.json()
+    name = data.get("name")
+    emoji = data.get("emoji")
+    if not name:
+        return web.json_response({"error": "Missing name"}, status=400)
+        
+    success = await Repository.rename_playlist(playlist_id, user_db_id, name, emoji)
+    return web.json_response({"success": success})
+
+async def handle_playlist_tracks(request: web.Request) -> web.Response:
+    user_id = request.query.get("user_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+        
+    playlist_id = int(request.match_info["id"])
+    tracks = await Repository.get_playlist_tracks(playlist_id, user_db_id)
+    return web.json_response(tracks)
+
+async def handle_add_track(request: web.Request) -> web.Response:
+    user_id = request.query.get("user_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+        
+    data = await request.json()
+    playlist_id = data.get("playlist_id")
+    track_data = data.get("track")
+    if not playlist_id or not track_data:
+        return web.json_response({"error": "Missing playlist_id or track data"}, status=400)
+        
+    # Get or create TrackInfo
+    track_info = await Repository.get_or_create_track_info(
+        source_id=track_data["id"],
+        title=track_data["title"],
+        artist=track_data.get("artist", ""),
+        album=track_data.get("album", ""),
+        duration_sec=track_data.get("duration_sec", 0),
+        cover_url=track_data.get("cover_url", ""),
+        preview_url=track_data.get("preview_url", ""),
+        genre=track_data.get("genre", "")
+    )
+    
+    # Actually if they add to "Favorites", they might not pass playlist_id? 
+    # Let's assume frontend gets the favorites playlist ID or uses a specific endpoint.
+    # The plan says: `POST /api/library/track` -> `{playlist_id, track}`
+    success = await Repository.add_track_to_playlist(playlist_id, track_info.id)
+    return web.json_response({"success": success})
+
+async def handle_remove_track(request: web.Request) -> web.Response:
+    user_id = request.query.get("user_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+        
+    data = await request.json()
+    playlist_id = data.get("playlist_id")
+    track_info_id = data.get("track_info_id")
+    if not playlist_id or not track_info_id:
+        return web.json_response({"error": "Missing playlist_id or track_info_id"}, status=400)
+        
+    success = await Repository.remove_track_from_playlist(playlist_id, track_info_id)
+    return web.json_response({"success": success})
+
+async def handle_send_playlist(request: web.Request) -> web.Response:
+    bot = request.app.get("bot")
+    if not bot:
+        return web.json_response({"error": "Bot not available"}, status=500)
+        
+    user_id = request.query.get("user_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+        
+    data = await request.json()
+    playlist_id = data.get("playlist_id")
+    chat_id = data.get("chat_id")
+    if not playlist_id or not chat_id:
+        return web.json_response({"error": "Missing playlist_id or chat_id"}, status=400)
+        
+    # Fetch tracks from DB
+    db_tracks = await Repository.get_playlist_tracks(playlist_id, user_db_id)
+    if not db_tracks:
+        return web.json_response({"error": "Playlist empty or not found"}, status=404)
+        
+    # Get playlist metadata (need name, emoji)
+    playlists = await Repository.get_user_playlists(user_db_id)
+    pl = next((p for p in playlists if p['id'] == playlist_id), None)
+    if not pl:
+        return web.json_response({"error": "Playlist not found"}, status=404)
+        
+    # Create SpotifyCollection
+    tracks = []
+    for t in db_tracks:
+        tracks.append(SpotifyTrack(
+            id=t["source_id"],
+            title=t["title"],
+            artist_str=t["artist"],
+            album=t["album"],
+            release_year="",
+            duration_sec=t["duration_sec"],
+            cover_url=t["cover_url"]
+        ))
+        
+    collection = SpotifyCollection(
+        type="playlist",
+        id=f"user_pl_{playlist_id}",
+        title=f"{pl.get('emoji', '🎵')} {pl.get('name', 'Плейлист')}",
+        cover_url=pl.get("cover_url", ""),
+        tracks=tracks
+    )
+    
+    # 1. Send Header
+    header_msg_id = await DeliveryManager.send_header(bot, chat_id, collection)
+    
+    # 2. Start JobManager task
+    await JobManager.start_job(
+        chat_id=chat_id,
+        collection=collection,
+        status_msg_id=header_msg_id, # Can reuse header as status optionally, but we usually use a separate msg
+        bot=bot,
+        user_id=user_id,
+        header_msg_id=header_msg_id,
+        use_media_groups=True
+    )
+    
+    return web.json_response({"success": True})
+
+async def handle_check_favorite(request: web.Request) -> web.Response:
+    user_id = request.query.get("user_id")
+    source_id = request.query.get("source_id")
+    user_db_id = await _get_user_db_id(user_id)
+    if not user_db_id or not source_id:
+        return web.json_response({"error": "Missing params"}, status=400)
+        
+    is_fav = await Repository.is_track_in_favorites(user_db_id, source_id)
+    return web.json_response({"is_favorite": is_fav})
+
+async def handle_explore_genres(request: web.Request) -> web.Response:
+    genres = [
+      {"slug": "pop",       "name": "Поп",       "color": "#E13300"},
+      {"slug": "hip-hop",   "name": "Хип-хоп",   "color": "#BA5D07"},
+      {"slug": "rock",      "name": "Рок",       "color": "#608108"},
+      {"slug": "rnb",       "name": "R&B",       "color": "#477D95"},
+      {"slug": "electronic","name": "Электроника","color": "#0D73EC"},
+      {"slug": "jazz",      "name": "Джаз",      "color": "#777777"},
+      {"slug": "classical", "name": "Классика",  "color": "#7358FF"},
+      {"slug": "phonk",     "name": "Phonk",     "color": "#1E3264"},
+      {"slug": "metal",     "name": "Метал",     "color": "#503750"},
+      {"slug": "indie",     "name": "Инди",      "color": "#148A08"},
+      {"slug": "latin",     "name": "Латино",    "color": "#E8115B"},
+      {"slug": "reggaeton", "name": "Реггетон",  "color": "#D84000"}
+    ]
+    return web.json_response(genres)
+
+async def handle_explore_genre(request: web.Request) -> web.Response:
+    slug = request.match_info["slug"]
+    genre_map = {
+        "pop": 14, "hip-hop": 18, "rock": 21, "rnb": 15, "electronic": 7, 
+        "jazz": 11, "classical": 5, "phonk": 18, "metal": 21, "indie": 20, 
+        "latin": 12, "reggaeton": 12
+    }
+    genre_id = genre_map.get(slug)
+    if not genre_id:
+        return web.json_response({"error": "Genre not found"}, status=404)
+        
+    import aiohttp
+    url = f"https://itunes.apple.com/search?term={slug}&genreId={genre_id}&entity=song&limit=30"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as resp:
+                if resp.status != 200:
+                    return web.json_response({"error": "Failed to search iTunes API"}, status=500)
+                data = await resp.json()
+                
+        results = data.get("results", [])
+        tracks_data = []
+        for item in results:
+            track_id = f"itunes_{item.get('trackId')}"
+            cover_url = item.get("artworkUrl100", "")
+            if cover_url:
+                cover_url = cover_url.replace("100x100bb", "600x600bb")
+                
+            tracks_data.append({
+                "id": track_id,
+                "title": item.get("trackName", "Unknown"),
+                "artist": item.get("artistName", "Unknown"),
+                "album": item.get("collectionName", ""),
+                "duration_sec": item.get("trackTimeMillis", 0) // 1000,
+                "cover_url": cover_url,
+                "preview_url": item.get("previewUrl", "")
+            })
+            
+        return web.json_response({
+            "type": "genre",
+            "id": f"genre_{slug}",
+            "title": f"Жанр: {slug}",
+            "cover_url": "",
+            "total": len(tracks_data),
+            "tracks": tracks_data,
+        })
+    except Exception as e:
+        logger.error(f"Explore API error: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
 def create_webapp(bot=None) -> web.Application:
+
     app = web.Application()
     if bot:
         app["bot"] = bot
@@ -349,4 +614,19 @@ def create_webapp(bot=None) -> web.Application:
     app.router.add_get("/admin/api/recent-users", handle_admin_api_recent_users)
     app.router.add_static("/static/", STATIC_DIR, name="static")
 
+    # Library
+    app.router.add_get("/api/library", handle_library)
+    app.router.add_post("/api/library/playlist", handle_create_playlist)
+    app.router.add_delete("/api/library/playlist/{id}", handle_delete_playlist)
+    app.router.add_patch("/api/library/playlist/{id}", handle_rename_playlist)
+    app.router.add_get("/api/library/playlist/{id}/tracks", handle_playlist_tracks)
+    app.router.add_post("/api/library/track", handle_add_track)
+    app.router.add_delete("/api/library/track", handle_remove_track)
+    app.router.add_post("/api/library/send", handle_send_playlist)
+    app.router.add_get("/api/library/favorites/check", handle_check_favorite)
+    # Explore
+    app.router.add_get("/api/explore/genres", handle_explore_genres)
+    app.router.add_get("/api/explore/genre/{slug}", handle_explore_genre)
+
     return app
+
