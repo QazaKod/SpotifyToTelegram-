@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -92,7 +92,7 @@
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
     .track-item.selected .track-check { border-color: var(--link); background: var(--link); }
-    .track-item.selected .track-check::after { content: '✓'; color: var(--bg); font-size: 13px; font-weight: 700; }
+    .track-item.selected .track-check::after { content: 'вњ“'; color: var(--bg); font-size: 13px; font-weight: 700; }
 
     .genre-grid {
       display: grid; grid-template-columns: repeat(2, 1fr);
@@ -201,45 +201,45 @@
   <!-- PAGE: Search -->
   <div id="page-search" class="page">
     <div class="header">
-      <h1>🎵 Поиск</h1>
-      <p>Вставьте ссылку Spotify или название песни</p>
+      <h1>рџЋµ РџРѕРёСЃРє</h1>
+      <p>Р’СЃС‚Р°РІСЊС‚Рµ СЃСЃС‹Р»РєСѓ Spotify РёР»Рё РЅР°Р·РІР°РЅРёРµ РїРµСЃРЅРё</p>
     </div>
     <div class="search-box">
-      <input type="text" id="urlInput" placeholder="Ссылка или название..." autocomplete="off">
-      <button id="loadBtn" onclick="loadPlaylist()">Поиск</button>
+      <input type="text" id="urlInput" placeholder="РЎСЃС‹Р»РєР° РёР»Рё РЅР°Р·РІР°РЅРёРµ..." autocomplete="off">
+      <button id="loadBtn" onclick="loadPlaylist()">РџРѕРёСЃРє</button>
     </div>
     
     <div id="search-loading" class="loading hidden">
       <div class="spinner"></div>
-      <p id="loadingText">Загрузка...</p>
+      <p id="loadingText">Р—Р°РіСЂСѓР·РєР°...</p>
     </div>
 
     <div id="playlistContent" class="hidden" style="padding-bottom: 80px;">
       <div class="playlist-header">
         <img id="playlistCover" src="" alt="" style="display:none;">
         <div class="info">
-          <h2 id="playlistTitle">Результаты</h2>
+          <h2 id="playlistTitle">Р РµР·СѓР»СЊС‚Р°С‚С‹</h2>
           <p id="playlistMeta"></p>
         </div>
       </div>
       
       <div class="controls">
-        <label><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"> Выбрать всё</label>
-        <span class="selected-count" id="selectedCount">Выбрано: 0</span>
+        <label><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"> Р’С‹Р±СЂР°С‚СЊ РІСЃС‘</label>
+        <span class="selected-count" id="selectedCount">Р’С‹Р±СЂР°РЅРѕ: 0</span>
       </div>
       <ul class="track-list" id="trackList"></ul>
     </div>
     
     <div class="download-bar hidden" id="downloadBar">
-      <button id="downloadBtn" onclick="startDownload()">Отправить в чат (0)</button>
+      <button id="downloadBtn" onclick="startDownload()">РћС‚РїСЂР°РІРёС‚СЊ РІ С‡Р°С‚ (0)</button>
     </div>
   </div>
 
   <!-- PAGE: Explore -->
   <div id="page-explore" class="page hidden">
     <div class="header">
-      <h1>🧭 Жанры</h1>
-      <p>Исследуйте музыку по настроению</p>
+      <h1>рџ§­ Р–Р°РЅСЂС‹</h1>
+      <p>РСЃСЃР»РµРґСѓР№С‚Рµ РјСѓР·С‹РєСѓ РїРѕ РЅР°СЃС‚СЂРѕРµРЅРёСЋ</p>
     </div>
     <div id="genreGrid" class="genre-grid"></div>
   </div>
@@ -247,17 +247,17 @@
   <!-- PAGE: Library -->
   <div id="page-library" class="page hidden">
     <div class="header">
-      <h1>📚 Медиатека</h1>
-      <p>Ваши плейлисты и сохранённые треки</p>
+      <h1>рџ“љ РњРµРґРёР°С‚РµРєР°</h1>
+      <p>Р’Р°С€Рё РїР»РµР№Р»РёСЃС‚С‹ Рё СЃРѕС…СЂР°РЅС‘РЅРЅС‹Рµ С‚СЂРµРєРё</p>
     </div>
     <div id="libraryList"></div>
-    <button class="fab" onclick="showCreatePlaylistModal()">＋</button>
+    <button class="fab" onclick="showCreatePlaylistModal()">пј‹</button>
   </div>
 
   <!-- PAGE: Playlist Detail -->
   <div id="page-playlist" class="page hidden">
     <div class="top-bar">
-      <button class="back-btn" onclick="goBack()">◀ Назад</button>
+      <button class="back-btn" onclick="goBack()">в—Ђ РќР°Р·Р°Рґ</button>
     </div>
     <div class="playlist-header">
       <div class="info">
@@ -274,16 +274,16 @@
   <!-- TabBar -->
   <div class="tab-bar">
     <button class="tab-btn active" data-page="search" onclick="navigateTo('search')">
-      <span class="icon">🔍</span>
-      <span>Поиск</span>
+      <span class="icon">рџ”Ќ</span>
+      <span>РџРѕРёСЃРє</span>
     </button>
     <button class="tab-btn" data-page="explore" onclick="navigateTo('explore')">
-      <span class="icon">🧭</span>
-      <span>Жанры</span>
+      <span class="icon">рџ§­</span>
+      <span>Р–Р°РЅСЂС‹</span>
     </button>
     <button class="tab-btn" data-page="library" onclick="navigateTo('library')">
-      <span class="icon">📚</span>
-      <span>Моё</span>
+      <span class="icon">рџ“љ</span>
+      <span>РњРѕС‘</span>
     </button>
   </div>
 
@@ -291,23 +291,23 @@
   <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal(event)">
     <!-- Create Playlist -->
     <div id="modal-create-playlist" class="modal-content hidden" onclick="event.stopPropagation()">
-      <h3>Создать плейлист</h3>
-      <input type="text" id="newPlaylistName" placeholder="Название плейлиста" autocomplete="off">
-      <input type="text" id="newPlaylistEmoji" placeholder="Эмодзи (например: 🎵)" value="🎵" autocomplete="off">
+      <h3>РЎРѕР·РґР°С‚СЊ РїР»РµР№Р»РёСЃС‚</h3>
+      <input type="text" id="newPlaylistName" placeholder="РќР°Р·РІР°РЅРёРµ РїР»РµР№Р»РёСЃС‚Р°" autocomplete="off">
+      <input type="text" id="newPlaylistEmoji" placeholder="Р­РјРѕРґР·Рё (РЅР°РїСЂРёРјРµСЂ: рџЋµ)" value="рџЋµ" autocomplete="off">
       <div class="modal-actions">
-        <button class="modal-btn btn-cancel" onclick="closeModal()">Отмена</button>
-        <button class="modal-btn btn-submit" onclick="createPlaylist()">Создать</button>
+        <button class="modal-btn btn-cancel" onclick="closeModal()">РћС‚РјРµРЅР°</button>
+        <button class="modal-btn btn-submit" onclick="createPlaylist()">РЎРѕР·РґР°С‚СЊ</button>
       </div>
     </div>
 
     <!-- Add to Playlist -->
     <div id="modal-add-to-playlist" class="modal-content hidden" onclick="event.stopPropagation()">
-      <h3>Добавить в плейлист</h3>
+      <h3>Р”РѕР±Р°РІРёС‚СЊ РІ РїР»РµР№Р»РёСЃС‚</h3>
       <div id="playlistChoices" style="max-height: 300px; overflow-y: auto;">
         <!-- Choices injected here -->
       </div>
       <div class="modal-actions" style="margin-top: 16px;">
-        <button class="modal-btn btn-cancel" onclick="closeModal()">Отмена</button>
+        <button class="modal-btn btn-cancel" onclick="closeModal()">РћС‚РјРµРЅР°</button>
       </div>
     </div>
   </div>
@@ -385,7 +385,7 @@
       document.getElementById('playlistContent').classList.add('hidden');
       document.getElementById('downloadBar').classList.add('hidden');
       document.getElementById('search-loading').classList.remove('hidden');
-      document.getElementById('loadingText').textContent = isUrl ? 'Загрузка плейлиста...' : 'Поиск треков...';
+      document.getElementById('loadingText').textContent = isUrl ? 'Р—Р°РіСЂСѓР·РєР° РїР»РµР№Р»РёСЃС‚Р°...' : 'РџРѕРёСЃРє С‚СЂРµРєРѕРІ...';
       document.getElementById('loadBtn').disabled = true;
 
       try {
@@ -412,7 +412,7 @@
         }
         
         document.getElementById('playlistTitle').textContent = data.title;
-        document.getElementById('playlistMeta').textContent = `${data.total} треков найдено`;
+        document.getElementById('playlistMeta').textContent = `${data.total} С‚СЂРµРєРѕРІ РЅР°Р№РґРµРЅРѕ`;
 
         await renderTracks('trackList', tracks, true);
 
@@ -423,7 +423,7 @@
         updateSelectAllCheckbox();
         updateSelectedCount();
       } catch (e) {
-        alert('Ошибка. Проверьте ссылку или запрос и попробуйте снова.');
+        tg.showAlert('РћС€РёР±РєР°. РџСЂРѕРІРµСЂСЊС‚Рµ СЃСЃС‹Р»РєСѓ РёР»Рё Р·Р°РїСЂРѕСЃ Рё РїРѕРїСЂРѕР±СѓР№С‚Рµ СЃРЅРѕРІР°.');
         document.getElementById('search-loading').classList.add('hidden');
       } finally {
         document.getElementById('loadBtn').disabled = false;
@@ -447,14 +447,14 @@
         if (isSearch) {
           actionHtml = `
             <div class="track-actions" onclick="event.stopPropagation()">
-              <button class="track-action-btn" onclick="toggleFavorite(this, '${escapeHtml(JSON.stringify(track))}')">🤍</button>
-              <button class="track-action-btn" onclick="showAddToPlaylistModal('${escapeHtml(JSON.stringify(track))}')">＋</button>
+              <button class="track-action-btn" onclick="toggleFavorite(this, '${escapeHtml(JSON.stringify(track))}')">рџ¤Ќ</button>
+              <button class="track-action-btn" onclick="showAddToPlaylistModal('${escapeHtml(JSON.stringify(track))}')">пј‹</button>
             </div>
           `;
         } else if (playlistId) {
           actionHtml = `
             <div class="track-actions" onclick="event.stopPropagation()">
-              <button class="track-action-btn red" onclick="removeTrackFromPlaylist(${playlistId}, ${track.db_id || track.id})">✕</button>
+              <button class="track-action-btn red" onclick="removeTrackFromPlaylist(${playlistId}, ${track.db_id || track.id})">вњ•</button>
             </div>
           `;
         }
@@ -464,7 +464,7 @@
         li.innerHTML = `
           <div class="cover-wrap" onclick="event.stopPropagation(); togglePreview('${track.id}', '${track.preview_url || ''}')">
             <img src="${coverSmall || track.cover_url}" alt="" loading="lazy">
-            <div class="play-overlay">${track.preview_url ? '▶' : ''}</div>
+            <div class="play-overlay">${track.preview_url ? 'в–¶' : ''}</div>
           </div>
           <div class="track-info">
             <div class="title">${escapeHtml(track.title)}</div>
@@ -511,9 +511,9 @@
     
     function updateSelectedCount() {
       const n = selectedIds.size;
-      document.getElementById('selectedCount').textContent = `Выбрано: ${n}`;
+      document.getElementById('selectedCount').textContent = `Р’С‹Р±СЂР°РЅРѕ: ${n}`;
       const btn = document.getElementById('downloadBtn');
-      btn.textContent = `Отправить в чат (${n})`;
+      btn.textContent = `РћС‚РїСЂР°РІРёС‚СЊ РІ С‡Р°С‚ (${n})`;
       btn.disabled = n === 0;
     }
 
@@ -542,7 +542,7 @@
       const selectedTracks = tracks.filter(t => selectedIds.has(t.id));
       
       document.getElementById('downloadBtn').disabled = true;
-      document.getElementById('downloadBtn').textContent = 'Отправка...';
+      document.getElementById('downloadBtn').textContent = 'РћС‚РїСЂР°РІРєР°...';
       
       try {
         const resp = await fetch('/api/download', {
@@ -551,10 +551,10 @@
           body: JSON.stringify({ chat_id: userId, tracks: selectedTracks }),
         });
         if (!resp.ok) throw new Error();
-        tg.showPopup({ message: 'Загрузка запущена. Проверьте чат с ботом!' });
+        tg.showPopup({ message: 'Р—Р°РіСЂСѓР·РєР° Р·Р°РїСѓС‰РµРЅР°. РџСЂРѕРІРµСЂСЊС‚Рµ С‡Р°С‚ СЃ Р±РѕС‚РѕРј!' });
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       } catch (e) {
-        alert('Ошибка при запуске скачивания.');
+        tg.showAlert('РћС€РёР±РєР° РїСЂРё Р·Р°РїСѓСЃРєРµ СЃРєР°С‡РёРІР°РЅРёСЏ.');
       } finally {
         updateSelectedCount();
       }
@@ -580,7 +580,7 @@
       document.getElementById('playlistContent').classList.add('hidden');
       document.getElementById('downloadBar').classList.add('hidden');
       document.getElementById('search-loading').classList.remove('hidden');
-      document.getElementById('loadingText').textContent = `Загрузка: ${name}...`;
+      document.getElementById('loadingText').textContent = `Р—Р°РіСЂСѓР·РєР°: ${name}...`;
       
       try {
         const resp = await fetch(`/api/explore/genre/${slug}`);
@@ -588,8 +588,8 @@
         tracks = data.tracks || [];
         selectedIds = new Set();
         
-        document.getElementById('playlistTitle').textContent = `Жанр: ${name}`;
-        document.getElementById('playlistMeta').textContent = `${tracks.length} треков`;
+        document.getElementById('playlistTitle').textContent = `Р–Р°РЅСЂ: ${name}`;
+        document.getElementById('playlistMeta').textContent = `${tracks.length} С‚СЂРµРєРѕРІ`;
         document.getElementById('playlistCover').style.display = 'none';
         
         await renderTracks('trackList', tracks, true);
@@ -599,7 +599,7 @@
         document.getElementById('downloadBar').classList.remove('hidden');
         updateSelectAllCheckbox(); updateSelectedCount();
       } catch (e) {
-        alert('Ошибка загрузки жанра.');
+        tg.showAlert('РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё Р¶Р°РЅСЂР°.');
         document.getElementById('search-loading').classList.add('hidden');
       }
     }
@@ -611,10 +611,10 @@
         const list = document.getElementById('libraryList');
         list.innerHTML = userPlaylists.map(p => `
           <div class="library-item" onclick="showPlaylistDetail(${p.id})">
-            <div class="emoji">${p.emoji || '🎵'}</div>
+            <div class="emoji">${p.emoji || 'рџЋµ'}</div>
             <div class="info">
               <div class="name">${escapeHtml(p.name)}</div>
-              <div class="count">${p.track_count} треков</div>
+              <div class="count">${p.track_count} С‚СЂРµРєРѕРІ</div>
             </div>
             <div class="chevron">></div>
           </div>
@@ -628,15 +628,15 @@
       
       const p = userPlaylists.find(x => x.id === id);
       if (p) {
-        document.getElementById('detailPlaylistTitle').textContent = `${p.emoji || '🎵'} ${p.name}`;
-        document.getElementById('detailPlaylistMeta').textContent = `${p.track_count} треков`;
+        document.getElementById('detailPlaylistTitle').textContent = `${p.emoji || 'рџЋµ'} ${p.name}`;
+        document.getElementById('detailPlaylistMeta').textContent = `${p.track_count} С‚СЂРµРєРѕРІ`;
       }
 
       document.getElementById('detailTrackList').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
       
-      let actionsHtml = `<button class="primary" onclick="sendPlaylistToChat(${id})">📥 Отправить всё в чат</button>`;
+      let actionsHtml = `<button class="primary" onclick="sendPlaylistToChat(${id})">рџ“Ґ РћС‚РїСЂР°РІРёС‚СЊ РІСЃС‘ РІ С‡Р°С‚</button>`;
       if (!p?.is_favorites) {
-        actionsHtml += `<button onclick="deletePlaylist(${id})" class="danger">🗑 Удалить</button>`;
+        actionsHtml += `<button onclick="deletePlaylist(${id})" class="danger">рџ—‘ РЈРґР°Р»РёС‚СЊ</button>`;
       }
       document.getElementById('detailPlaylistActions').innerHTML = actionsHtml;
 
@@ -645,13 +645,13 @@
         const playlistTracks = await resp.json();
         await renderTracks('detailTrackList', playlistTracks, false, id);
       } catch (e) {
-        document.getElementById('detailTrackList').innerHTML = '<div class="loading">Ошибка загрузки треков</div>';
+        document.getElementById('detailTrackList').innerHTML = '<div class="loading">РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё С‚СЂРµРєРѕРІ</div>';
       }
     }
 
     async function sendPlaylistToChat(playlistId) {
       if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-      tg.showPopup({ message: 'Запуск доставки плейлиста...' });
+      tg.showPopup({ message: 'Р—Р°РїСѓСЃРє РґРѕСЃС‚Р°РІРєРё РїР»РµР№Р»РёСЃС‚Р°...' });
       
       try {
         await fetch('/api/library/send', {
@@ -672,7 +672,7 @@
     }
 
     async function deletePlaylist(id) {
-      if (confirm("Точно удалить плейлист?")) {
+      if (confirm("РўРѕС‡РЅРѕ СѓРґР°Р»РёС‚СЊ РїР»РµР№Р»РёСЃС‚?")) {
         try {
           await fetch(`/api/library/playlist/${id}?user_id=${userId}`, { method: 'DELETE' });
           goBack();
@@ -708,7 +708,7 @@
       const container = document.getElementById('playlistChoices');
       container.innerHTML = userPlaylists.map(p => `
         <div class="playlist-choice-item" onclick="addTrackToPlaylist(${p.id})">
-          <span style="font-size: 20px;">${p.emoji || '🎵'}</span>
+          <span style="font-size: 20px;">${p.emoji || 'рџЋµ'}</span>
           <span>${escapeHtml(p.name)}</span>
         </div>
       `).join('');
@@ -721,7 +721,7 @@
 
     async function createPlaylist() {
       const name = document.getElementById('newPlaylistName').value.trim();
-      const emoji = document.getElementById('newPlaylistEmoji').value.trim() || '🎵';
+      const emoji = document.getElementById('newPlaylistEmoji').value.trim() || 'рџЋµ';
       if (!name) return;
       
       try {
@@ -747,7 +747,7 @@
         });
         closeModal();
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        tg.showAlert("Трек добавлен в плейлист!");
+        tg.showAlert("РўСЂРµРє РґРѕР±Р°РІР»РµРЅ РІ РїР»РµР№Р»РёСЃС‚!");
       } catch (e) { console.error(e); }
     }
 
@@ -767,7 +767,7 @@
           body: JSON.stringify({ user_id: userId, playlist_id: fav.id, track: track })
         });
 
-        btnElement.textContent = '❤️';
+        btnElement.textContent = 'вќ¤пёЏ';
         btnElement.classList.add('red');
         if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
       } catch (e) { console.error(e); }
