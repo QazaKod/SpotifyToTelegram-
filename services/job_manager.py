@@ -82,8 +82,27 @@ class JobManager:
         async with job.batch_lock:
             if not job.batch_buffer:
                 return
-            items_to_send = job.batch_buffer[:10]
-            job.batch_buffer = job.batch_buffer[10:]
+                
+            items_to_send = []
+            current_batch_size = 0
+            MAX_BATCH_SIZE_BYTES = 45 * 1024 * 1024  # 45 MB limit for Telegram Bot API
+            
+            for item in job.batch_buffer:
+                if len(items_to_send) >= 10:
+                    break
+                    
+                file_size = 0
+                if 'mp3_path' in item and os.path.exists(item['mp3_path']):
+                    file_size = os.path.getsize(item['mp3_path'])
+                
+                # If adding this file exceeds 45 MB, send current batch (unless it's the first track)
+                if current_batch_size + file_size > MAX_BATCH_SIZE_BYTES and len(items_to_send) > 0:
+                    break
+                    
+                items_to_send.append(item)
+                current_batch_size += file_size
+                
+            job.batch_buffer = job.batch_buffer[len(items_to_send):]
 
         media_group = []
         temp_files = []
